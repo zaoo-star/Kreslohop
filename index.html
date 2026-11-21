@@ -445,28 +445,37 @@ function components(mask, cw, ch){
 function processImage(img, rot, thr){
   const { cw, ch, ink, col } = inkMap(img, rot, thr, 420), N = cw*ch;
   const closed = dilate(ink, cw, ch, 2);
-  // Papír = nekreslené plochy, které sahají k okraji fotky nebo jsou hodně velké
-  const open = new Uint8Array(N); for(let p=0; p<N; p++) open[p] = closed[p] ? 0 : 1;
-  const holes = components(open, cw, ch), paper = new Uint8Array(N);
-  const isPaper = new Set(holes.comps.filter(c => c.border || c.area > N*0.2).map(c => c.id));
-  for(let p=0; p<N; p++) if(open[p] && isPaper.has(holes.lab[p])) paper[p] = 1;
-  const fig = new Uint8Array(N); for(let p=0; p<N; p++) fig[p] = paper[p] ? 0 : 1;
-  const { lab, comps } = components(fig, cw, ch);
-  let cands = comps.filter(c => !c.border);
-  if(!cands.length) cands = comps;
+  const { lab, comps } = components(closed, cw, ch);
+  // Jak moc se kus dotýká okraje fotky. Stůl kolem papíru vede podél velké části okraje,
+  // kresba, která jen kousek přesahuje, se okraje dotýká málo.
+  const contact = new Map(), addC = p => { const id = lab[p]; if(id) contact.set(id, (contact.get(id)||0) + 1); };
+  for(let px=0; px<cw; px++){ addC(px); addC((ch-1)*cw+px); }
+  for(let py=1; py<ch-1; py++){ addC(py*cw); addC(py*cw+cw-1); }
+  const perim = 2*(cw+ch);
+  const cands = comps.filter(c => (contact.get(c.id)||0) < perim*0.2);
   if(!cands.length) return null;
-  const big = Math.max(...cands.map(c => c.area));
-  if(big < 150) return null;
-  const keep = new Set(cands.filter(c => c.area >= Math.max(40, big*0.03)).map(c => c.id));
+  const main = cands.reduce((a, b) => b.area > a.area ? b : a);
+  if(main.area < 150) return null;
+  // Další kousky (oči, pusa, ruce) bereme, když jsou u hlavního kusu a nesahají k okraji
+  const mw = main.x1-main.x0+1, mh = main.y1-main.y0+1;
+  const ex0 = main.x0 - mw*0.35, ex1 = main.x1 + mw*0.35, ey0 = main.y0 - mh*0.35, ey1 = main.y1 + mh*0.35;
+  const keep = new Set([main.id]);
+  for(const c of cands){
+    if(c === main || c.border || c.area < Math.max(40, main.area*0.03)) continue;
+    if(c.x0 >= ex0 && c.x1 <= ex1 && c.y0 >= ey0 && c.y1 <= ey1) keep.add(c.id);
+  }
   let X0=cw, Y0=ch, X1=0, Y1=0;
-  for(const c of cands) if(keep.has(c.id)){ X0=Math.min(X0,c.x0); Y0=Math.min(Y0,c.y0); X1=Math.max(X1,c.x1); Y1=Math.max(Y1,c.y1); }
-  if(X1-X0 > cw*0.97 && Y1-Y0 > ch*0.97) return null;
+  for(const c of comps) if(keep.has(c.id)){ X0=Math.min(X0,c.x0); Y0=Math.min(Y0,c.y0); X1=Math.max(X1,c.x1); Y1=Math.max(Y1,c.y1); }
+  // Vnitřek obrysu (uzavřené plochy uvnitř kresby) patří k postavičce, papír kolem ne
+  const open = new Uint8Array(N); for(let p=0; p<N; p++) open[p] = closed[p] ? 0 : 1;
+  const holes = components(open, cw, ch);
+  const fill = new Set(holes.comps.filter(h => !h.border && h.x0 >= X0 && h.x1 <= X1 && h.y0 >= Y0 && h.y1 <= Y1).map(h => h.id));
   const bw = X1-X0+1, bh = Y1-Y0+1;
   const crop = document.createElement('canvas'); crop.width = bw; crop.height = bh;
   const cx = crop.getContext('2d'), od = cx.createImageData(bw, bh);
   for(let yy=0; yy<bh; yy++) for(let xx=0; xx<bw; xx++){
     const p = (yy+Y0)*cw + xx+X0, o = (yy*bw+xx)*4, i = p*4;
-    if(keep.has(lab[p])){ od.data[o]=col[i]; od.data[o+1]=col[i+1]; od.data[o+2]=col[i+2]; od.data[o+3]=255; }
+    if(keep.has(lab[p]) || (open[p] && fill.has(holes.lab[p]))){ od.data[o]=col[i]; od.data[o+1]=col[i+1]; od.data[o+2]=col[i+2]; od.data[o+3]=255; }
   }
   cx.putImageData(od, 0, 0);
   const s2 = Math.min(200/bh, 280/bw, 2.5);
