@@ -102,6 +102,41 @@
   #tRight{left:calc(116px + env(safe-area-inset-left))}
   #tJump{right:calc(20px + env(safe-area-inset-right));width:104px!important;height:104px!important;font-size:22px!important}
 
+
+  /* Ovládání pro děti, které ještě nečtou: velké obrázky, krátké popisky */
+  .topbar{display:flex;align-items:center;justify-content:space-between;gap:12px}
+  .iconbtn{width:60px;height:60px;flex:none;border:3px solid #23201c;border-radius:16px;background:#fff;font-size:30px;cursor:pointer;padding:0}
+  .iconbtn.off{opacity:.45}
+  .hero{cursor:pointer}
+  .btn.play{min-height:96px;background:#5cc94a}
+  .playico{display:block;width:0;height:0;border-style:solid;border-width:26px 0 26px 44px;border-color:transparent transparent transparent #fff;margin-left:10px;filter:drop-shadow(0 0 0 #23201c)}
+  .btn.ok{min-height:84px;background:#5cc94a;margin-top:14px}
+  .okico{font-size:46px;line-height:1;color:#fff}
+  .lico{font-size:38px}
+  .tab{min-height:84px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px}
+  .tab .ti{font-size:34px;line-height:1.1}
+  .tab .tl{font-size:12px}
+  .row2,.row3{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:10px 0 12px}
+  .row3{grid-template-columns:1fr 1fr 1fr}
+  .tile{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;min-height:96px;width:100%;
+    font:inherit;color:#23201c;background:#fff;border:3px solid #23201c;border-radius:18px;cursor:pointer;padding:8px;box-shadow:0 4px 0 #23201c}
+  .tile:active{transform:translateY(3px);box-shadow:0 1px 0 #23201c}
+  .tile .ti{font-size:42px;line-height:1.1}
+  .tile .tl{font-size:15px;font-weight:800}
+  .tile.wide{flex-direction:row;gap:14px;margin-bottom:12px}
+  .chkt{position:relative}
+  .chkt input{position:absolute;top:10px;left:10px;width:30px;height:30px;accent-color:#5cc94a}
+  .chkt:has(input:not(:checked)) .ti{filter:grayscale(1);opacity:.35}
+  .slide{display:flex;align-items:center;gap:10px;margin:16px 0 4px}
+  .slide .sico{font-size:36px;flex:none}
+  .lvl{min-height:104px;position:relative;overflow:hidden}
+  .lvl .le{display:block;font-size:34px;line-height:1.2}
+  .lvl .ln{position:absolute;top:4px;left:8px;font-size:20px}
+  .parents{opacity:.75;margin-top:18px}
+  .msgicon{font-size:64px;line-height:1.1;text-align:center;margin-bottom:6px}
+  #msg h2{text-align:center}
+  #msgBtns .btn{min-height:72px;font-size:22px}
+  #msgBtns .btn .bi{font-size:32px}
   #toast{position:fixed;left:50%;top:calc(70px + env(safe-area-inset-top));z-index:40;transform:translate(-50%,-20px);opacity:0;
     background:#fff;border:3px solid #23201c;border-radius:16px;padding:10px 16px;font-weight:900;font-size:18px;
     pointer-events:none;transition:transform .25s,opacity .25s;white-space:nowrap;max-width:94vw;overflow:hidden;text-overflow:ellipsis}
@@ -129,33 +164,35 @@
 
 <div id="toast" role="status"></div>
 
-<!-- MENU -->
+<!-- MENU – ovládání obrázky, hlas čte, co tlačítko dělá -->
 <section id="menu" class="screen">
   <div class="card">
-    <h1>Kreslohop</h1>
-    <p>Nakresli postavičku na papír, vyfoť ji a skákej za ni po levelech.</p>
-    <div class="hero"><img id="heroImg" alt="Vybraná postavička"></div>
+    <div class="topbar">
+      <h1>Kreslohop</h1>
+      <button class="iconbtn" id="bVoice" data-nosay aria-label="Hlas zapnout nebo vypnout">🗣️</button>
+    </div>
+    <div class="hero" id="heroBox" role="button" tabindex="0" aria-label="Moje postavička"><img id="heroImg" alt=""></div>
     <div class="charname" id="heroName"></div>
-    <button class="btn primary" id="bPlay">Hrát</button>
+    <button class="btn primary play" id="bPlay" aria-label="Hrát"><span class="playico" aria-hidden="true"></span></button>
 
-    <div class="label">Levely</div>
+    <div class="label"><span class="lico" aria-hidden="true">🗺️</span></div>
     <div class="lvgrid" id="levels"></div>
 
-    <div class="label">Kreslení</div>
+    <div class="label"><span class="lico" aria-hidden="true">✏️</span></div>
     <div class="tabs" role="tablist">
-      <button class="tab on" data-kind="hero" role="tab">Postavička</button>
-      <button class="tab" data-kind="enemy" role="tab">Příšerka</button>
-      <button class="tab" data-kind="coin" role="tab">Mince</button>
-      <button class="tab" data-kind="level" role="tab">Level</button>
+      <button class="tab on" data-kind="hero" role="tab" aria-label="Postavička"><span class="ti">🙂</span><span class="tl">Postavička</span></button>
+      <button class="tab" data-kind="enemy" role="tab" aria-label="Příšerka"><span class="ti">👾</span><span class="tl">Příšerka</span></button>
+      <button class="tab" data-kind="coin" role="tab" aria-label="Mince"><span class="ti">🪙</span><span class="tl">Mince</span></button>
+      <button class="tab" data-kind="level" role="tab" aria-label="Level"><span class="ti">🧱</span><span class="tl">Level</span></button>
     </div>
-    <p class="small" id="tabHint"></p>
     <div class="gallery" id="gallery"></div>
-    <button class="btn" id="bCamera">📷 Vyfotit</button>
-    <button class="btn" id="bGallery">🖼️ Vybrat obrázek z galerie</button>
-
-    <div class="label">Samolepky</div>
-    <button class="btn" id="bStickers">⭐ Moje samolepky</button>
-    <p class="small">Na počítači: šipky nebo A/D, skok mezerníkem, pauza Esc.</p>
+    <div class="row2">
+      <button class="tile" id="bCamera" aria-label="Vyfotit"><span class="ti">📷</span><span class="tl">Vyfotit</span></button>
+      <button class="tile" id="bGallery" aria-label="Vybrat fotku z galerie"><span class="ti">🖼️</span><span class="tl">Z galerie</span></button>
+    </div>
+    <button class="tile wide" id="bStickers" aria-label="Samolepky"><span class="ti">⭐</span><span class="tl" id="stkLbl"></span></button>
+    <p class="small parents" id="tabHint"></p>
+    <p class="small parents">Pro rodiče: 🗣️ vpravo nahoře zapíná hlas, který dětem přečte každé tlačítko. Na počítači šipky nebo A/D, skok mezerníkem, pauza Esc.</p>
     <input type="file" id="fCamera" accept="image/*" capture="environment" hidden>
     <input type="file" id="fGallery" accept="image/*" hidden>
   </div>
@@ -167,21 +204,18 @@
     <h2 id="edTitle">Tvoje postavička</h2>
     <canvas id="preview" width="600" height="420" aria-label="Náhled kresby"></canvas>
     <p id="edWarn" class="warn" hidden></p>
-    <div class="label">Kolik papíru odstranit</div>
-    <input type="range" id="thr" min="15" max="120" value="42" aria-label="Kolik papíru odstranit">
-    <div class="rangelbl"><span>Míň (zmizí kus kresby?)</span><span>Víc (zůstal papír?)</span></div>
-    <div class="row" style="margin-top:14px"><button class="btn" id="bRot">↻ Otočit</button></div>
-    <div class="label">Jak se jmenuje?</div>
-    <input type="text" id="charName" maxlength="20" placeholder="Třeba Pepík" autocomplete="off">
-    <div style="height:18px"></div>
-    <button class="btn primary" id="bSaveChar">Hrát s ní</button>
-    <button class="btn" id="bEdBack">Zpět</button>
-    <div class="label">Jak nakreslit, aby to vyšlo</div>
-    <ul class="tips">
-      <li>Kresli na bílý papír a obrázek obtáhni fixou.</li>
-      <li>Foť shora, při světle, ať je papír vidět kolem dokola.</li>
-      <li>Když kus kresby zmizí, posuň posuvník doleva.</li>
-    </ul>
+    <div class="slide">
+      <span class="sico" aria-hidden="true">🖍️</span>
+      <input type="range" id="thr" min="15" max="120" value="42" aria-label="Kolik papíru odstranit" data-say="Posuň, ať je obrázek celý a bez papíru">
+      <span class="sico" aria-hidden="true">🧽</span>
+    </div>
+    <div class="row2">
+      <button class="tile" id="bRot" aria-label="Otočit"><span class="ti">↻</span><span class="tl">Otočit</span></button>
+      <button class="tile" id="bEdBack" aria-label="Zpět, nechci"><span class="ti">✖</span><span class="tl">Zpět</span></button>
+    </div>
+    <input type="text" id="charName" maxlength="20" placeholder="✏️ Jméno (nemusíš)" autocomplete="off" aria-label="Jméno, nemusíš vyplňovat">
+    <button class="btn primary ok" id="bSaveChar" aria-label="Hotovo, hrát s ní"><span class="okico">✔</span></button>
+    <p class="small parents">Pro rodiče: kreslete na bílý papír a obtáhněte fixou, foťte shora při světle. Když kus kresby zmizí, posuňte posuvník k pastelce 🖍️, když zůstane papír, k houbičce 🧽.</p>
   </div>
 </section>
 
@@ -190,44 +224,41 @@
   <div class="card">
     <h2>Tvůj level</h2>
     <canvas id="lpreview" width="640" height="300" aria-label="Náhled levelu"></canvas>
-    <p id="lvInfo" class="small" style="margin-top:8px"></p>
+    <p id="lvInfo" class="small parents" style="margin-top:8px"></p>
     <p id="lvWarn" class="warn" hidden></p>
-    <div class="label">Jak moc musí být čára vidět</div>
-    <input type="range" id="lthr" min="15" max="120" value="45" aria-label="Citlivost čar">
-    <div class="rangelbl"><span>Míň (chybí kus čáry?)</span><span>Víc (je tam smetí?)</span></div>
-    <div class="row" style="margin-top:14px">
-      <button class="btn" id="bLRot">↻ Otočit papír</button>
+    <div class="slide">
+      <span class="sico" aria-hidden="true">🖍️</span>
+      <input type="range" id="lthr" min="15" max="120" value="45" aria-label="Citlivost čar" data-say="Posuň, ať jsou vidět všechny čáry">
+      <span class="sico" aria-hidden="true">🧽</span>
     </div>
-    <label class="chk"><input type="checkbox" id="lGround" checked> Zem dole po celé délce</label>
-    <label class="chk"><input type="checkbox" id="lItems" checked> Přidat mince a příšerky</label>
-    <button class="btn" id="bLAdd">➕ Přidat další papír</button>
-    <div class="label">Jak se level jmenuje?</div>
-    <input type="text" id="lvName" maxlength="24" placeholder="Třeba Hrad" autocomplete="off">
-    <div style="height:18px"></div>
-    <button class="btn primary" id="bLSave">Hrát level</button>
-    <button class="btn" id="bLBack">Zpět</button>
-    <div class="label">Jak nakreslit level</div>
-    <ul class="tips">
-      <li>Papír polož na šířku. Každá čára nebo vybarvená plocha bude plošinka.</li>
-      <li>Kresli fixou tlustší čáry. Moc vysoké zdi se nedají přeskočit.</li>
-      <li>Hra začíná vlevo a cíl je vpravo. Další papíry se přidají za sebe.</li>
-    </ul>
+    <div class="row3">
+      <button class="tile" id="bLRot" aria-label="Otočit papír"><span class="ti">↻</span><span class="tl">Otočit</span></button>
+      <button class="tile" id="bLAdd" aria-label="Přidat další papír"><span class="ti">➕📄</span><span class="tl">Papír</span></button>
+      <button class="tile" id="bLBack" aria-label="Zpět, nechci"><span class="ti">✖</span><span class="tl">Zpět</span></button>
+    </div>
+    <div class="row2">
+      <label class="tile chkt" data-say="Zem dole po celé délce"><input type="checkbox" id="lGround" checked><span class="ti">🟫</span><span class="tl">Zem</span></label>
+      <label class="tile chkt" data-say="Mince a příšerky"><input type="checkbox" id="lItems" checked><span class="ti">🪙👾</span><span class="tl">Mince</span></label>
+    </div>
+    <input type="text" id="lvName" maxlength="24" placeholder="✏️ Jméno (nemusíš)" autocomplete="off" aria-label="Jméno levelu, nemusíš vyplňovat">
+    <button class="btn primary ok" id="bLSave" aria-label="Hotovo, hrát level"><span class="okico">✔</span></button>
+    <p class="small parents">Pro rodiče: papír na šířku, každá čára nebo vybarvená plocha bude plošinka. Kreslete tlustší fixou, moc vysoké zdi se nedají přeskočit. Začíná se vlevo, cíl je vpravo, další papíry se přidají za sebe.</p>
   </div>
 </section>
 
 <!-- SAMOLEPKY -->
 <section id="stickers" class="screen" hidden>
   <div class="card">
-    <h2>Moje samolepky</h2>
-    <p id="stkCount"></p>
+    <h2>⭐ <span id="stkCount"></span></h2>
     <div class="stkgrid" id="stkGrid"></div>
-    <button class="btn primary" id="bStkBack">Zpět</button>
+    <button class="btn primary ok" id="bStkBack" aria-label="Zpět"><span class="okico">🏠</span></button>
   </div>
 </section>
 
 <!-- ZPRÁVY -->
 <section id="msg" class="screen dim" hidden>
   <div class="card">
+    <div id="msgIcon" class="msgicon" aria-hidden="true"></div>
     <h2 id="msgTitle"></h2>
     <p id="msgText"></p>
     <div id="msgBtns"></div>
@@ -583,8 +614,35 @@ const STICKERS = [
   { id:'mincovna', e:'🌟', n:'Mincovna',         d:'Nakresli vlastní minci' },
   { id:'stavitel', e:'🧱', n:'Stavitel',         d:'Nakresli vlastní level' }
 ];
+/* Hlas: přečte dětem, co dělá tlačítko, na které ťukly */
+let voiceOn = store.get('kh_voice', true);
+let lastSay = '', lastSayT = 0;
+function say(text, queue){
+  if(!voiceOn || !text || !('speechSynthesis' in window)) return;
+  try{
+    const t = String(text).replace(/\p{Extended_Pictographic}|\uFE0F|[★☆✔✖↻▶]/gu, '').replace(/\s+/g, ' ').trim();
+    if(!t) return;
+    const voices = speechSynthesis.getVoices(), cz = voices.find(v => /^cs/i.test(v.lang));
+    if(voices.length && !cz) return;          // bez českého hlasu radši mlčet
+    const now = Date.now(); if(t === lastSay && now - lastSayT < 1500) return;
+    lastSay = t; lastSayT = now;
+    if(!queue) speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(t); u.lang = 'cs-CZ'; u.rate = 0.95; if(cz) u.voice = cz;
+    speechSynthesis.speak(u);
+  }catch(e){}
+}
+try{ if('speechSynthesis' in window) speechSynthesis.getVoices(); }catch(e){}
+document.addEventListener('click', e => {
+  const el = e.target.closest('[data-say],button,[role=button],label');
+  if(!el || el.closest('#touch') || el.hasAttribute('data-nosay')) return;
+  if(el.closest('#msgBtns') && el.closest('#msg')) { say(el.getAttribute('aria-label')); return; }
+  say(el.dataset.say || el.getAttribute('aria-label') || el.textContent);
+}, true);
+document.addEventListener('change', e => { if(e.target.matches('input[type=range]') && e.target.dataset.say) say(e.target.dataset.say); }, true);
+
 let toastTimer = 0;
 function toast(text){
+  say(text, true);
   const el = $('#toast'); el.textContent = text; el.classList.add('show');
   clearTimeout(toastTimer); toastTimer = setTimeout(() => el.classList.remove('show'), 2600);
 }
@@ -867,6 +925,7 @@ function startLevel(ref){
   $('#hud').classList.toggle('night', !!G.th.night);
   document.querySelector('meta[name=theme-color]').setAttribute('content', G.th.sky);
   updateHud();
+  say(G.def.name);
 }
 
 /* Pohyb s kolizemi */
@@ -1419,31 +1478,36 @@ function showScreen(id){
   for(const s of SCREENS) $(s).hidden = (s !== id);
   if(id && id !== '#msg'){ $('#hud').hidden = true; $('#touch').hidden = true; }
 }
-function showMsg(title, text, btns){
-  $('#msgTitle').textContent = title; $('#msgText').textContent = text;
+function showMsg(title, text, btns, icon, speak){
+  $('#msgIcon').textContent = icon || '';
+  $('#msgTitle').textContent = title; $('#msgText').textContent = text; $('#msgText').hidden = !text;
   const box = $('#msgBtns'); box.innerHTML = '';
   for(const b of btns){
     const el = document.createElement('button'); el.className = 'btn' + (b.primary ? ' primary' : '');
-    el.textContent = b.label; el.onclick = b.fn; box.appendChild(el);
+    el.setAttribute('aria-label', b.label);
+    el.innerHTML = (b.icon ? '<span class="bi" aria-hidden="true">' + b.icon + '</span> ' : '') + '<span></span>';
+    el.lastChild.textContent = b.label;
+    el.onclick = b.fn; box.appendChild(el);
   }
   showScreen('#msg');
+  say(speak || title);
 }
 function pause(){
   if(state !== 'play') return;
   state = 'pause'; saveStats();
-  showMsg('Pauza', 'Dej si chvilku oddech.', [
-    { label:'Pokračovat', primary:true, fn: resume },
-    { label:'Začít level znovu', fn: () => startLevel(G.ref) },
-    { label:'Do menu', fn: toMenu }
-  ]);
+  showMsg('Pauza', '', [
+    { icon:'▶', label:'Hrát dál', primary:true, fn: resume },
+    { icon:'↻', label:'Znovu od začátku', fn: () => startLevel(G.ref) },
+    { icon:'🏠', label:'Domů', fn: toMenu }
+  ], '⏸️');
 }
 function resume(){ state = 'play'; showScreen(null); $('#hud').hidden = false; $('#touch').hidden = !isTouch; }
 function gameOver(){
   state = 'over'; sfx.lose(); saveStats();
-  showMsg('Ajaj!', 'Došla srdíčka. Zkusíme to znovu?', [
-    { label:'Zkusit znovu', primary:true, fn: () => startLevel(G.ref) },
-    { label:'Do menu', fn: toMenu }
-  ]);
+  showMsg('Ajaj!', '', [
+    { icon:'↻', label:'Zkusit znovu', primary:true, fn: () => startLevel(G.ref) },
+    { icon:'🏠', label:'Domů', fn: toMenu }
+  ], '💔', 'Ajaj, došla srdíčka. Zkusíme to znovu?');
 }
 function czCoins(n){ return n === 1 ? '1 minci' : (n >= 2 && n <= 4) ? n + ' mince' : n + ' mincí'; }
 function levelDone(){
@@ -1457,19 +1521,19 @@ function levelDone(){
   if(main){
     const k = 'm' + G.ref;
     if(!STARS[k] || STARS[k] < stars){ STARS[k] = stars; store.set('kh_stars', STARS); }
-    if(G.ref + 1 > progress){ progress = Math.min(LEVELS.length-1, G.ref + 1); store.set('kh_progress', progress); }
     if(LEVELS.every((_, i) => STARS['m'+i])) award('vse');
   }
   saveStats();
   const last = !main || G.ref === LEVELS.length-1;
-  const title = (G.goalT ? 'Gól! ' : 'Hotovo! ') + '★'.repeat(stars) + '☆'.repeat(3-stars);
-  const text = selOf('hero').name + ' nasbíral ' + czCoins(got) + ' z ' + total + '.' +
-    (stars < 3 ? ' Na 3 hvězdy je potřeba skoro všechny mince.' : ' Paráda, všechny hvězdy!');
+  const title = G.goalT ? 'Gól!' : 'Hotovo!';
+  const text = '🪙 ' + got + ' / ' + total;
   const btns = [];
-  if(!last) btns.push({ label:'Další level', primary:true, fn: () => startLevel(G.ref+1) });
-  btns.push({ label:'Hrát znovu', primary:last, fn: () => startLevel(G.ref) });
-  btns.push({ label:'Do menu', fn: toMenu });
-  showMsg(title, text, btns);
+  if(!last) btns.push({ icon:'▶', label:'Další level', primary:true, fn: () => startLevel(G.ref+1) });
+  btns.push({ icon:'↻', label:'Hrát znovu', primary:last, fn: () => startLevel(G.ref) });
+  btns.push({ icon:'🏠', label:'Domů', fn: toMenu });
+  const starWord = stars === 1 ? 'jednu hvězdu' : stars === 2 ? 'dvě hvězdy' : 'tři hvězdy';
+  showMsg(title, text, btns, '⭐'.repeat(stars) + '☆'.repeat(3-stars),
+    title + ' Máš ' + starWord + '. ' + (stars < 3 ? 'Na tři hvězdy posbírej skoro všechny mince.' : 'Paráda!'));
 }
 function toMenu(){ state = 'menu'; G = null; saveStats(); renderMenu(); showScreen('#menu');
   document.querySelector('meta[name=theme-color]').setAttribute('content', '#8fd3ff'); }
@@ -1482,7 +1546,9 @@ const TAB_HINT = {
   coin: 'Tohle sbíráš místo mincí.',
   level: 'Nakresli na papír čáry a kostky. Ze všeho, co nakreslíš, budou plošinky. Ťukni na level a hraj.'
 };
-const CAM_LABEL = { hero:'📷 Vyfotit novou postavičku', enemy:'📷 Vyfotit novou příšerku', coin:'📷 Vyfotit novou minci', level:'📷 Vyfotit nakreslený level' };
+const CAM_LABEL = { hero:'Vyfotit novou postavičku', enemy:'Vyfotit novou příšerku', coin:'Vyfotit novou minci', level:'Vyfotit nakreslený level' };
+const TAB_NAME = { hero:'Postavička', enemy:'Příšerka', coin:'Mince', level:'Nakreslený level' };
+const LV_ICON = ['🌼','🌲','⛰️','❄️','🐠','⚽','🌙'];
 
 function levelThumb(lv){
   return canvasOf(120, 60, x => {
@@ -1498,19 +1564,24 @@ function renderMenu(){
   const lv = $('#levels'); lv.innerHTML = '';
   LEVELS.forEach((L, i) => {
     const b = document.createElement('button'); b.className = 'lvl';
-    const st = STARS['m'+i] || 0;
-    b.innerHTML = (i <= progress ? (i+1) : '🔒') + '<span>' + L.name + '</span>' +
-      (i <= progress ? '<span class="st">' + '★'.repeat(st) + '☆'.repeat(3-st) + '</span>' : '');
-    b.disabled = i > progress; b.onclick = () => startLevel(i);
-    b.setAttribute('aria-label', 'Level ' + (i+1) + ' ' + L.name + (i > progress ? ', zamčeno' : ', hvězdy ' + st));
+    const st = STARS['m'+i] || 0, th = THEMES[L.theme];
+    b.style.background = th.sky; b.style.boxShadow = 'inset 0 -16px 0 ' + th.top;
+    if(th.night) b.style.color = '#fff';
+    b.innerHTML = '<span class="ln">' + (i+1) + '</span><span class="le">' + LV_ICON[i] + '</span>' +
+      '<span class="st">' + '★'.repeat(st) + '☆'.repeat(3-st) + '</span>';
+    b.onclick = () => startLevel(i);
+    b.setAttribute('aria-label', L.name + (st ? ', ' + st + (st === 1 ? ' hvězda' : ' hvězdy') : ''));
     lv.appendChild(b);
   });
-  for(const t of document.querySelectorAll('.tab')) t.classList.toggle('on', t.dataset.kind === tab);
+  for(const t of document.querySelectorAll('.tab')){
+    t.classList.toggle('on', t.dataset.kind === tab);
+    t.dataset.say = TAB_NAME[t.dataset.kind] + '. ' + TAB_HINT[t.dataset.kind];
+  }
   $('#tabHint').textContent = TAB_HINT[tab];
-  $('#bCamera').textContent = CAM_LABEL[tab];
+  $('#bCamera').setAttribute('aria-label', CAM_LABEL[tab]);
   const gal = $('#gallery'); gal.innerHTML = '';
   if(tab === 'level'){
-    if(!MYLV.length){ const p = document.createElement('p'); p.className = 'small'; p.textContent = 'Zatím tu žádný nakreslený level není.'; gal.appendChild(p); }
+    if(!MYLV.length){ const p = document.createElement('p'); p.className = 'small'; p.textContent = '📄✏️ → 📷 → 🧱'; gal.appendChild(p); }
     for(const l of MYLV){
       const d = document.createElement('div'); d.className = 'thumb wide'; d.setAttribute('role', 'button'); d.tabIndex = 0;
       d.setAttribute('aria-label', 'Hrát level ' + l.name);
@@ -1532,28 +1603,29 @@ function renderMenu(){
       gal.appendChild(d);
     }
   }
-  $('#bPlay').textContent = progress > 0 ? 'Hrát ' + (progress+1) + '. level' : 'Hrát';
-  $('#bStickers').textContent = '⭐ Moje samolepky (' + Object.keys(STK).filter(k => STICKERS.some(s => s.id === k)).length + ' z ' + STICKERS.length + ')';
+  const nStk = STICKERS.filter(s => STK[s.id]).length;
+  $('#stkLbl').textContent = nStk + ' / ' + STICKERS.length;
+  $('#bStickers').setAttribute('aria-label', 'Samolepky. Máš ' + nStk + ' z ' + STICKERS.length);
 }
 function addDel(el, name, doDelete){
   const x = document.createElement('button'); x.className = 'del'; x.textContent = '×'; x.setAttribute('aria-label', 'Smazat ' + name);
   x.onclick = ev => { ev.stopPropagation();
-    showMsg('Smazat ' + name + '?', 'Zmizí z tohohle zařízení a nepůjde vrátit.', [
-      { label:'Smazat', primary:true, fn: () => { doDelete(); renderMenu(); showScreen('#menu'); } },
-      { label:'Nechat', fn: () => showScreen('#menu') } ]); };
+    showMsg('Smazat ' + name + '?', 'Zmizí a nepůjde vrátit.', [
+      { icon:'🗑️', label:'Smazat', primary:true, fn: () => { doDelete(); renderMenu(); showScreen('#menu'); } },
+      { icon:'✖', label:'Nechat', fn: () => showScreen('#menu') } ], '🗑️'); };
   el.appendChild(x);
 }
 function renderStickers(){
   const n = STICKERS.filter(s => STK[s.id]).length;
-  $('#stkCount').textContent = 'Máš ' + n + ' z ' + STICKERS.length + '. Šedé ještě čekají, pod každou je napsané, co pro ni udělat.';
+  $('#stkCount').textContent = n + ' / ' + STICKERS.length;
   $('#stkGrid').innerHTML = STICKERS.map(s =>
-    `<div class="stk${STK[s.id] ? '' : ' off'}"><b>${s.e}</b><div class="n">${s.n}</div><div class="d">${s.d}</div></div>`).join('');
+    `<div class="stk${STK[s.id] ? '' : ' off'}" role="button" tabindex="0" data-say="${s.n}. ${STK[s.id] ? 'Tuhle už máš.' : s.d + '.'}"><b>${s.e}</b><div class="n">${s.n}</div><div class="d">${s.d}</div></div>`).join('');
 }
 
 /* ---------- Editor kresby ---------- */
 let edKind = 'hero', edImg = null, edRot = 0, edResult = null, edTimer = 0;
 const ED_TITLE = { hero:'Tvoje postavička', enemy:'Tvoje příšerka', coin:'Tvoje mince' };
-const ED_SAVE = { hero:'Hrát s ní', enemy:'Uložit příšerku', coin:'Uložit minci' };
+const ED_SAVE = { hero:'Hotovo, hrát s ní', enemy:'Hotovo, uložit příšerku', coin:'Hotovo, uložit minci' };
 const ED_PH = { hero:'Třeba Pepík', enemy:'Třeba Kousal', coin:'Třeba Hvězdička' };
 function openFile(file){
   if(!file) return;
@@ -1562,12 +1634,12 @@ function openFile(file){
   im.onload = () => {
     if(tab === 'level'){ lvAddSheet(im); return; }
     edKind = tab; edImg = im; edRot = 0;
-    $('#charName').value = ''; $('#charName').placeholder = ED_PH[edKind];
-    $('#edTitle').textContent = ED_TITLE[edKind]; $('#bSaveChar').textContent = ED_SAVE[edKind];
+    $('#charName').value = ''; $('#charName').placeholder = '✏️ ' + ED_PH[edKind] + ' (nemusíš)';
+    $('#edTitle').textContent = ED_TITLE[edKind]; $('#bSaveChar').setAttribute('aria-label', ED_SAVE[edKind]); say(ED_TITLE[edKind] + '. Když je hotová, ťukni na zelenou fajfku.');
     showScreen('#editor'); runProcess();
   };
   im.onerror = () => { URL.revokeObjectURL(url);
-    showMsg('Fotku nejde otevřít', 'Tenhle obrázek neumím načíst. Zkus jinou fotku (JPG nebo PNG).', [ { label:'Zpět', primary:true, fn: () => showScreen('#menu') } ]); };
+    showMsg('Fotku nejde otevřít', 'Zkus jinou fotku (JPG nebo PNG).', [ { icon:'🏠', label:'Zpět', primary:true, fn: () => showScreen('#menu') } ], '😕'); };
   im.src = url;
 }
 function runProcess(){
@@ -1581,7 +1653,8 @@ function runProcess(){
   const warn = $('#edWarn');
   if(!edResult){
     warn.hidden = false;
-    warn.textContent = 'Na fotce jsem nenašel kresbu. Posuň posuvník doleva, nebo vyfoť obrázek znovu tak, aby byl kolem něj bílý papír.';
+    warn.textContent = '🖍️ ⬅️ Na fotce jsem nenašel kresbu. Posuň posuvník k pastelce, nebo vyfoť obrázek znovu tak, aby byl kolem něj bílý papír.';
+    say('Obrázek jsem nenašel. Posuň posuvník k pastelce, nebo to vyfoť znovu.');
     $('#bSaveChar').disabled = true; return;
   }
   warn.hidden = true; $('#bSaveChar').disabled = false;
@@ -1604,7 +1677,7 @@ function saveChar(){
   award({ hero:'malir', enemy:'prisera', coin:'mincovna' }[edKind]);
   edImg = null;
   if(edKind === 'hero'){
-    const im = imgFor(ch), go = () => startLevel(progress);
+    const im = imgFor(ch), go = () => playNext();
     if(im.complete && im.naturalWidth) go(); else im.onload = go;
   } else { renderMenu(); showScreen('#menu'); toast(edKind === 'enemy' ? '👾 Příšerka je ve hře!' : '🌟 Mince jsou nakreslené!'); }
 }
@@ -1689,7 +1762,10 @@ $('#touch').addEventListener('contextmenu', e => e.preventDefault());
 
 $('#bPause').onclick = pause;
 $('#bSound').onclick = () => { soundOn = !soundOn; store.set('kh_sound', soundOn); updateHud(); };
-$('#bPlay').onclick = () => startLevel(progress);
+function playNext(){ const i = LEVELS.findIndex((_, k) => !STARS['m'+k]); startLevel(i < 0 ? 0 : i); }
+$('#bPlay').onclick = playNext;
+$('#heroBox').onclick = () => { tab = 'hero'; renderMenu(); $('#gallery').scrollIntoView({ behavior:'smooth', block:'center' }); };
+$('#bVoice').onclick = () => { voiceOn = !voiceOn; store.set('kh_voice', voiceOn); $('#bVoice').classList.toggle('off', !voiceOn); if(voiceOn) say('Hlas je zapnutý'); else try{ speechSynthesis.cancel(); }catch(e){} };
 for(const t of document.querySelectorAll('.tab')) t.onclick = () => { tab = t.dataset.kind; renderMenu(); };
 $('#bCamera').onclick = () => $('#fCamera').click();
 $('#bGallery').onclick = () => $('#fGallery').click();
@@ -1727,7 +1803,8 @@ DEF.enemy.thumb = makeThumb(c => drawCritter(c, THEMES.meadow, -1, 0));
 DEF.coin.thumb = makeThumb(c => { c.fillStyle = '#ffd23f'; c.strokeStyle = '#7a5a00'; c.lineWidth = 3;
   c.beginPath(); c.ellipse(0, -20, 13, 15, 0, 0, Math.PI*2); c.fill(); c.stroke(); c.strokeStyle = '#e0a800'; c.beginPath(); c.ellipse(0, -20, 6, 8, 0, 0, Math.PI*2); c.stroke(); });
 for(const k of KINDS) if(!allOf(k).some(c => c.id === SEL[k])) SEL[k] = DEF[k].id;
-progress = Math.max(0, Math.min(LEVELS.length-1, progress|0));
+progress = LEVELS.length-1;   // všechny levely jsou odemčené
+$('#bVoice').classList.toggle('off', !voiceOn);
 resize();
 renderMenu();
 showScreen('#menu');
