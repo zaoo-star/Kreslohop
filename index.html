@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
-<title>Kreslohop – skákej za svou nakreslenou postavičku</title>
+<title>Kreslík – nakresli si hrdinu a hraj za něj</title>
 <meta name="theme-color" content="#8fd3ff">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon-192.png">
@@ -216,7 +216,7 @@
 <section id="menu" class="screen">
   <div class="card">
     <div class="topbar">
-      <h1>Kreslohop</h1>
+      <h1>Kreslík</h1>
       <button class="iconbtn" id="bVoice" data-nosay aria-label="Hlas zapnout nebo vypnout">🗣️</button>
     </div>
     <div class="hero" id="heroBox" role="button" tabindex="0" aria-label="Moje postavička"><img id="heroImg" alt=""></div>
@@ -664,7 +664,7 @@ function assembleLevel(grids, ground){
    ===================================================================== */
 const KINDS = ['hero', 'enemy', 'coin'];
 const DEF = {
-  hero:  { id:'hopik', name:'Hopík', src:null },
+  hero:  { id:'hopik', name:'Kreslík', src:null },
   enemy: { id:'def-enemy', name:'Brouk', src:null },
   coin:  { id:'def-coin', name:'Mince', src:null }
 };
