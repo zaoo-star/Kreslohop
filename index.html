@@ -40,7 +40,8 @@
   .hero{display:flex;align-items:flex-end;justify-content:center;height:220px;margin:6px 0 4px;
     background:#8fd3ff;border:3px solid #23201c;border-radius:20px;overflow:hidden;position:relative}
   .hero::after{content:"";position:absolute;left:0;right:0;bottom:0;height:34px;background:#5cc94a;border-top:3px solid #23201c}
-  .hero img{position:relative;z-index:1;max-height:160px;max-width:80%;margin-bottom:28px;animation:hop 1.2s ease-in-out infinite}
+  .hero img{position:relative;z-index:1;max-height:160px;max-width:80%;margin-bottom:28px;animation:hop 1.2s ease-in-out infinite;filter:drop-shadow(4px 3px 0 #8a7660) drop-shadow(2px 2px 0 #5e4f3e)}
+  .thumb img{filter:drop-shadow(2px 2px 0 #8a7660)}
   @keyframes hop{0%,100%{transform:translateY(0)}50%{transform:translateY(-14px)}}
   @media (prefers-reduced-motion:reduce){.hero img{animation:none}}
   .charname{text-align:center;font-size:22px;font-weight:900;margin:8px 0 14px}
@@ -549,7 +550,7 @@ function components(mask, cw, ch){
 
 // Fotka kresby -> vyříznutá postavička s průhledným pozadím
 function processImage(img, rot, thr){
-  const { cw, ch, ink, col } = inkMap(img, rot, thr, 420), N = cw*ch;
+  const { cw, ch, ink, col } = inkMap(img, rot, thr, 520), N = cw*ch;
   const closed = dilate(ink, cw, ch, 2);
   const { lab, comps } = components(closed, cw, ch);
   // Jak moc se kus dotýká okraje fotky. Stůl kolem papíru vede podél velké části okraje,
@@ -577,14 +578,38 @@ function processImage(img, rot, thr){
   const holes = components(open, cw, ch);
   const fill = new Set(holes.comps.filter(h => !h.border && h.x0 >= X0 && h.x1 <= X1 && h.y0 >= Y0 && h.y1 <= Y1).map(h => h.id));
   const bw = X1-X0+1, bh = Y1-Y0+1;
+  const s2 = Math.min(240/bh, 320/bw, 2.5);
   const crop = document.createElement('canvas'); crop.width = bw; crop.height = bh;
-  const cx = crop.getContext('2d'), od = cx.createImageData(bw, bh);
+  const cx = crop.getContext('2d'), od = cx.createImageData(bw, bh), D = od.data, inkC = new Uint8Array(bw*bh);
   for(let yy=0; yy<bh; yy++) for(let xx=0; xx<bw; xx++){
     const p = (yy+Y0)*cw + xx+X0, o = (yy*bw+xx)*4, i = p*4;
-    if(keep.has(lab[p]) || (open[p] && fill.has(holes.lab[p]))){ od.data[o]=col[i]; od.data[o+1]=col[i+1]; od.data[o+2]=col[i+2]; od.data[o+3]=255; }
+    if(!(keep.has(lab[p]) || (open[p] && fill.has(holes.lab[p])))) continue;
+    let r = col[i], g = col[i+1], b = col[i+2];
+    const lum = (r*3 + g*6 + b)/10, sat = Math.max(r,g,b) - Math.min(r,g,b);
+    if(!ink[p] && lum > 140 && sat < 70){ r = 255; g = 253; b = 247; }          // papír uvnitř kresby = čistá bílá
+    else {
+      const k = 1.45;                                                            // sytější barvy
+      r = lum + (r - lum)*k; g = lum + (g - lum)*k; b = lum + (b - lum)*k;
+      if(ink[p]){ const dk = lum < 150 ? 0.72 : 0.9; r *= dk; g *= dk; b *= dk; inkC[yy*bw+xx] = 1; }  // tmavší čáry
+    }
+    D[o] = r; D[o+1] = g; D[o+2] = b; D[o+3] = 255;
+  }
+  // Tenké čáry se při zmenšení ztrácí – ztlustíme je podle toho, jak moc se obrázek zmenší
+  // odhad tloušťky čáry: plocha / obvod * 2; cíl je zhruba 9 px ve výsledném obrázku
+  let inkA = 0, inkP = 0;
+  for(let q=0; q<bw*bh; q++) if(inkC[q]){ inkA++; const xx = q % bw;
+    if(xx === 0 || xx === bw-1 || q < bw || q >= bw*(bh-1) || !inkC[q-1] || !inkC[q+1] || !inkC[q-bw] || !inkC[q+bw]) inkP++; }
+  const strokeW = inkP ? 2*inkA/inkP : 0;
+  const R = Math.max(0, Math.min(7, Math.round((9/s2 - strokeW)/2)));
+  for(let pass=0; pass<2*R; pass++){
+    const src = new Uint8ClampedArray(D), m0 = inkC.slice(), vert = pass % 2;
+    for(let yy=0; yy<bh; yy++) for(let xx=0; xx<bw; xx++){
+      const q = yy*bw+xx; if(m0[q] || !D[q*4+3]) continue;
+      const nbs = vert ? [q-bw, q+bw] : [xx > 0 ? q-1 : -1, xx < bw-1 ? q+1 : -1];
+      for(const nb of nbs) if(nb >= 0 && nb < bw*bh && m0[nb]){ D[q*4] = src[nb*4]; D[q*4+1] = src[nb*4+1]; D[q*4+2] = src[nb*4+2]; inkC[q] = 1; break; }
+    }
   }
   cx.putImageData(od, 0, 0);
-  const s2 = Math.min(200/bh, 280/bw, 2.5);
   const fin = canvasOf(Math.max(1, Math.round(bw*s2)), Math.max(1, Math.round(bh*s2)), fx => { fx.imageSmoothingQuality = 'high'; fx.drawImage(crop, 0, 0, fx.canvas.width, fx.canvas.height); });
   return stickerize(fin, 4);
 }
@@ -1425,15 +1450,16 @@ function drawCritter(c, th, dir, t){
   c.beginPath(); c.arc(-8+look, -22, 3, 0, Math.PI*2); c.arc(8+look, -22, 3, 0, Math.PI*2); c.fill();
   c.beginPath(); c.moveTo(-15, -35); c.lineTo(-3, -31); c.moveTo(15, -35); c.lineTo(3, -31); c.stroke();
 }
-function drawEnemyAt(cx, by, dir, t, scale, sq, hurtFlash){
-  ctx.save(); ctx.translate(cx, by); ctx.scale(scale, scale*sq);
+function drawEnemyAt(cx, by, dir, t, scale, sq, hurtFlash, shadow=true){
+  ctx.save(); ctx.translate(cx, by); ctx.scale(scale, scale);
+  if(shadow) groundShadow(ctx, 44);
+  ctx.scale(1, sq);
   if(hurtFlash) ctx.globalAlpha = 0.5;
-  if(CUR_ENEMY_IMG && CUR_ENEMY_IMG.complete && CUR_ENEMY_IMG.naturalWidth){
-    const im = CUR_ENEMY_IMG, ar = im.naturalWidth/im.naturalHeight;
+  if(imgReady(CUR_ENEMY_IMG)){
+    const im = CUR_ENEMY_IMG, ar = (im.naturalWidth || im.width)/(im.naturalHeight || im.height);
     let h = 52, w = h*ar; if(w > 66){ w = 66; h = w/ar; }
     ctx.rotate(Math.sin(t*10)*0.08);
-    ctx.scale(dir > 0 ? -1 : 1, 1);
-    ctx.drawImage(im, -w/2, -h+3, w, h);
+    draw3D(ctx, im, 0, 3, w, h, dir > 0 ? -1 : 1);
   } else drawCritter(ctx, CUR_TH, dir, t);
   ctx.restore();
 }
@@ -1444,16 +1470,21 @@ function drawCrown(cx, y){
 }
 
 function drawCoin(x, y, t){
-  const sx = Math.abs(Math.cos(t*3 + x*0.05));
-  if(CUR_COIN_IMG && CUR_COIN_IMG.complete && CUR_COIN_IMG.naturalWidth){
-    const im = CUR_COIN_IMG, ar = im.naturalWidth/im.naturalHeight;
+  const cs = Math.cos(t*3 + x*0.05), sx = Math.abs(cs), side = (1 - sx)*5*(cs < 0 ? -1 : 1);
+  if(imgReady(CUR_COIN_IMG)){
+    const im = CUR_COIN_IMG, pr = prepSprite(im), ar = (im.naturalWidth || im.width)/(im.naturalHeight || im.height);
     let h = 38, w = h*ar; if(w > 44){ w = 44; h = w/ar; }
-    ctx.save(); ctx.translate(x, y); ctx.scale(Math.max(0.15, sx), 1); ctx.drawImage(im, -w/2, -h/2, w, h); ctx.restore();
+    ctx.save(); ctx.translate(x, y);
+    for(let k=1; k<=3; k++){ ctx.save(); ctx.translate(side*k/3, 0); ctx.scale(Math.max(0.12, sx), 1); ctx.drawImage(pr.edge2, -w/2, -h/2, w, h); ctx.restore(); }
+    ctx.scale(Math.max(0.12, sx), 1); ctx.drawImage(pr.lit, -w/2, -h/2, w, h); ctx.restore();
     return;
   }
-  ctx.fillStyle = '#ffd23f'; ctx.strokeStyle = '#7a5a00'; ctx.lineWidth = 3;
+  ctx.fillStyle = '#c99a00'; ctx.strokeStyle = '#7a5a00'; ctx.lineWidth = 3;
+  ctx.beginPath(); ctx.ellipse(x + side, y, Math.max(2, 13*sx), 15, 0, 0, Math.PI*2); ctx.fill(); ctx.stroke();
+  ctx.fillStyle = '#ffd23f';
   ctx.beginPath(); ctx.ellipse(x, y, Math.max(2, 13*sx), 15, 0, 0, Math.PI*2); ctx.fill(); ctx.stroke();
-  if(sx > .4){ ctx.strokeStyle = '#e0a800'; ctx.beginPath(); ctx.ellipse(x, y, 6*sx, 8, 0, 0, Math.PI*2); ctx.stroke(); }
+  if(sx > .4){ ctx.strokeStyle = '#e0a800'; ctx.beginPath(); ctx.ellipse(x, y, 6*sx, 8, 0, 0, Math.PI*2); ctx.stroke();
+    ctx.strokeStyle = 'rgba(255,255,255,.85)'; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.arc(x - 3*sx, y - 4, 7*sx, Math.PI*1.05, Math.PI*1.45); ctx.stroke(); }
 }
 function drawItem(it){
   const cx = it.x + it.w/2, by = it.y + it.h;
@@ -1488,12 +1519,15 @@ function drawPlayer(){
     ctx.fillStyle = `hsla(${(TNOW*500)%360},95%,60%,.45)`;
     ctx.beginPath(); ctx.ellipse(p.x+p.w/2, p.y+p.h-p.dh/2, p.dw*0.7, p.dh*0.65, 0, 0, Math.PI*2); ctx.fill();
   }
+  const turn = turnTo(p, p.face);
+  if(p.onG && MODE === 'run'){ ctx.save(); ctx.translate(p.x + p.w/2, p.y + p.h + 3); groundShadow(ctx, p.dw); ctx.restore(); }
   ctx.save();
   ctx.translate(p.x + p.w/2, p.y + p.h + 3 + bob);
   ctx.rotate(rot*p.face);
-  ctx.scale(sx*p.face, sy);
+  ctx.scale(sx, sy);
   if(p.inv > 1.25) ctx.translate((Math.random()-.5)*6, 0);   // otřese se po zásahu
-  drawHero(ctx, p.img, p.dw, p.dh, TNOW, Math.abs(p.vx) > 10 || !p.onG);
+  drawHero(ctx, p.img, p.dw, p.dh, TNOW, Math.abs(p.vx) > 10 || !p.onG, turn, false);
+  ctx.scale(turn < 0 ? -1 : 1, 1);
   if(p.feather){ // malá křidélka
     ctx.fillStyle = '#fff'; ctx.strokeStyle = OUT; ctx.lineWidth = 2.5;
     const fl = Math.sin(TNOW*(p.onG ? 4 : 18))*0.3;
@@ -1676,20 +1710,68 @@ function drawAcc(c, id, w, h, t){
   c.restore();
 }
 // Postavička s „gumovou“ animací a doplňky. (0,0) = střed dole.
-function drawHero(c, img, w, h, t, moving){
-  const eq = EQ;
-  if(eq.back) drawAcc(c, eq.back, w, h, t);
-  if(img && img.complete && img.naturalWidth){
-    const iw = img.naturalWidth, ih = img.naturalHeight, N = 10;
-    const amp = moving ? w*0.045 : w*0.015, sp = moving ? 14 : 3;
-    const breath = moving ? 1 : 1 + Math.sin(t*3)*0.025;
-    for(let i=0; i<N; i++){
-      const k = 1 - i/N, dx = Math.sin(t*sp + i*0.7)*amp*k;
-      const hh = h*breath;
-      c.drawImage(img, 0, i*ih/N, iw, ih/N + 1, -w/2 + dx, -hh + i*hh/N, w, hh/N + 1);
-    }
-  } else { c.fillStyle = '#ff8a3d'; c.fillRect(-w/2, -h, w, h); }
-  for(const sl of ['neck', 'face', 'hat']) if(eq[sl]) drawAcc(c, eq[sl], w, h, t);
+/* Kresba jako vystřižená kartonová figurka: světlo shora zleva, boční hrana, stín na zemi */
+const prepCache = new WeakMap();
+function imgReady(im){ return !!(im && (im.naturalWidth || im.width) && im.complete !== false); }
+function prepSprite(img){
+  if(!imgReady(img)) return null;
+  let p = prepCache.get(img); if(p) return p;
+  const w = img.naturalWidth || img.width, h = img.naturalHeight || img.height;
+  const lit = canvasOf(w, h, c => {
+    c.drawImage(img, 0, 0);
+    c.globalCompositeOperation = 'source-atop';
+    const g = c.createLinearGradient(0, 0, w*0.7, h);
+    g.addColorStop(0, 'rgba(255,255,255,0.32)'); g.addColorStop(0.42, 'rgba(255,255,255,0)');
+    g.addColorStop(0.7, 'rgba(0,0,0,0)'); g.addColorStop(1, 'rgba(40,25,10,0.22)');
+    c.fillStyle = g; c.fillRect(0, 0, w, h);
+  });
+  const edge = canvasOf(w, h, c => { c.drawImage(img, 0, 0); c.globalCompositeOperation = 'source-in'; c.fillStyle = '#8a7660'; c.fillRect(0, 0, w, h); });
+  const edge2 = canvasOf(w, h, c => { c.drawImage(img, 0, 0); c.globalCompositeOperation = 'source-in'; c.fillStyle = '#5e4f3e'; c.fillRect(0, 0, w, h); });
+  p = { lit, edge, edge2, w, h }; prepCache.set(img, p); return p;
+}
+// plynulé otočení (jako když se otočí kartička)
+function turnTo(o, target){
+  if(!o) return target;
+  const now = TNOW, dt = Math.min(0.1, Math.max(0, now - (o._tt || now))); o._tt = now;
+  if(o._f === undefined) o._f = target;
+  o._f += (target - o._f)*Math.min(1, dt*13);
+  return o._f;
+}
+function drawSlices(c, src, w, h, t, moving){
+  const iw = src.width, ih = src.height, N = 10;
+  const amp = moving ? w*0.045 : w*0.015, sp = moving ? 14 : 3;
+  const hh = h*(moving ? 1 : 1 + Math.sin(t*3)*0.025);
+  for(let i=0; i<N; i++){
+    const dx = Math.sin(t*sp + i*0.7)*amp*(1 - i/N);
+    c.drawImage(src, 0, i*ih/N, iw, ih/N + 1, -w/2 + dx, -hh + i*hh/N, w, hh/N + 1);
+  }
+}
+function groundShadow(c, w){ c.save(); c.fillStyle = 'rgba(30,25,20,.22)'; c.beginPath(); c.ellipse(0, 1, w*0.42, Math.max(3, w*0.085), 0, 0, Math.PI*2); c.fill(); c.restore(); }
+function drawHero(c, img, w, h, t, moving, turn=1, shadow=false){
+  if(shadow) groundShadow(c, w);
+  const fx = Math.abs(turn) < 0.06 ? (turn < 0 ? -0.06 : 0.06) : turn;
+  const pr = prepSprite(img);
+  if(!pr){ c.fillStyle = '#ff8a3d'; c.fillRect(-w/2, -h, w, h); return; }
+  // boční hrana kartonu – při otáčení je jí vidět víc
+  const depth = Math.max(2.5, w*0.05) + (1 - Math.abs(fx))*w*0.14;
+  for(let k=3; k>=1; k--){
+    c.save(); c.translate(depth*k/3, depth*k/3*0.4); c.scale(fx, 1);
+    drawSlices(c, k === 3 ? pr.edge2 : pr.edge, w, h, t, moving); c.restore();
+  }
+  c.save(); c.scale(fx, 1);
+  if(EQ.back) drawAcc(c, EQ.back, w, h, t);
+  drawSlices(c, pr.lit, w, h, t, moving);
+  for(const sl of ['neck', 'face', 'hat']) if(EQ[sl]) drawAcc(c, EQ[sl], w, h, t);
+  c.restore();
+}
+// statická kartonová kresba (příšerky, mince, náhledy)
+function draw3D(c, img, x, y, w, h, flip=1){
+  const pr = prepSprite(img); if(!pr) return;
+  const d = Math.max(2, w*0.06);
+  c.save(); c.translate(x, y);
+  for(let k=3; k>=1; k--){ c.save(); c.translate(d*k/3, d*k/3*0.4); c.scale(flip, 1); c.drawImage(k === 3 ? pr.edge2 : pr.edge, -w/2, -h, w, h); c.restore(); }
+  c.scale(flip, 1); c.drawImage(pr.lit, -w/2, -h, w, h);
+  c.restore();
 }
 // Stopa za postavičkou (ve světových souřadnicích)
 let TRAIL = [], trailAcc = 0;
@@ -2293,8 +2375,8 @@ function renderBomb(){
     const im = P.img, ar = (im.naturalWidth || 100)/(im.naturalHeight || 120);
     let h = 50, w = h*ar; if(w > 56){ w = 56; h = w/ar; }
     const bob = Math.abs(Math.sin(pl.walkT*14))*-3;
-    ctx.save(); ctx.translate(pl.x, pl.y + BC*0.45 + bob); ctx.scale(pl.face, 1);
-    drawHero(ctx, im, w, h, TNOW, !!pl.moving);
+    ctx.save(); ctx.translate(pl.x, pl.y + BC*0.45); groundShadow(ctx, w); ctx.translate(0, bob);
+    drawHero(ctx, im, w, h, TNOW, !!pl.moving, turnTo(pl, pl.face), false);
     ctx.restore();
   }
   drawPaper();
@@ -2364,11 +2446,11 @@ function mgStepCommon(dt){
   mgParts(dt);
 }
 // postavička: (x, spodek) a výška
-function heroAt(x, by, h, face=1, moving=false, rot=0, blink=true){
+function heroAt(x, by, h, face=1, moving=false, rot=0, blink=true, shadow=true){
   const im = P.img, ar = (im.naturalWidth || 100)/(im.naturalHeight || 120);
   let w = h*ar; if(w > h*1.3){ w = h*1.3; h = w/ar; }
   if(blink && MG.inv > 0 && Math.floor(MG.inv*12) % 2 === 0) return w;
-  ctx.save(); ctx.translate(x, by); ctx.rotate(rot); ctx.scale(face, 1); drawHero(ctx, im, w, h, TNOW, moving); ctx.restore();
+  ctx.save(); ctx.translate(x, by); ctx.rotate(rot); drawHero(ctx, im, w, h, TNOW, moving, blink ? turnTo(MG, face) : face, shadow); ctx.restore();
   return w;
 }
 function skyFill(c){ ctx.setTransform(DPR, 0, 0, DPR, 0, 0); ctx.fillStyle = c; ctx.fillRect(0, 0, VW, VH); }
@@ -2436,9 +2518,9 @@ MINIS.fly = { name:'Létání', icon:'🐦', unit:'🏁', ctrl:'tap', say:'Lét�
       }
     }
     for(const c of m.cns) if(!c.taken) drawCoin(c.x, c.y, TNOW);
-    for(const e of m.ens) drawEnemyAt(e.x, e.y + 20, -1, TNOW + e.ph, 1, 1, false);
+    for(const e of m.ens) drawEnemyAt(e.x, e.y + 20, -1, TNOW + e.ph, 1, 1, false, false);
     trailDraw();
-    heroAt(m.dist + 120, m.y + 28, 58, 1, true, Math.max(-0.5, Math.min(0.6, m.vy/900)));
+    heroAt(m.dist + 120, m.y + 28, 58, 1, true, Math.max(-0.5, Math.min(0.6, m.vy/900)), true, false);
     mgDrawParts();
     if(!m.go){ ctx.font = '54px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('👆', m.dist + 120, 400 + Math.sin(TNOW*5)*8); }
     ctx.restore();
@@ -2501,7 +2583,8 @@ MINIS.runner = { name:'Běh', icon:'🏃', unit:'📏', ctrl:'tap', say:'Běh. P
     }
     for(const c of m.cns) if(!c.taken) drawCoin(c.x, c.y, TNOW);
     trailDraw();
-    heroAt(m.dist + 110, m.y + 3, 62, 1, true);
+    if(!m.onG){ ctx.save(); ctx.translate(m.dist + 110, 503); groundShadow(ctx, 40*(1 - Math.min(0.6, (500 - m.y)/300))); ctx.restore(); }
+    heroAt(m.dist + 110, m.y + 3, 62, 1, true, 0, true, m.onG);
     mgDrawParts();
     ctx.restore();
     drawPaper();
@@ -2543,7 +2626,7 @@ MINIS.catch = { name:'Chytání', icon:'🧺', unit:'🪙', ctrl:'lr', say:'Chyt
     for(const it of m.items){
       if(it.type === 'coin') drawCoin(it.x, it.y, TNOW + it.x);
       else if(it.type === 'heart'){ ctx.font = '40px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('❤️', it.x, it.y); }
-      else drawEnemyAt(it.x, it.y + 22, 1, TNOW + it.x, 1, 1, false);
+      else drawEnemyAt(it.x, it.y + 22, 1, TNOW + it.x, 1, 1, false, false);
     }
     trailDraw();
     heroAt(m.x, 692, 74, m.face, Math.abs(m.vx) > 30);
@@ -2637,9 +2720,9 @@ MINIS.sling = { name:'Prak', icon:'🎯', unit:'🏰', ctrl:'drag', say:'Prak. N
     }
     if(!m.ball && m.shots > 0 && !m.won){
       ctx.strokeStyle = '#4a2f1a'; ctx.lineWidth = 6; ctx.beginPath(); ctx.moveTo(SL_REST.x - 26, SL_REST.y - 6); ctx.lineTo(pull.x, pull.y); ctx.lineTo(SL_REST.x + 26, SL_REST.y - 6); ctx.stroke();
-      heroAt(pull.x, pull.y + 26, 56, 1, false, 0, false);
+      heroAt(pull.x, pull.y + 26, 56, 1, false, 0, false, false);
     }
-    if(m.ball){ const b = m.ball; heroAt(b.x, b.y + 26, 56, 1, true, b.rot*0.3, false); }
+    if(m.ball){ const b = m.ball; heroAt(b.x, b.y + 26, 56, 1, true, b.rot*0.3, false, false); }
     // zbývající střely
     for(let i=0; i<Math.max(0, m.shots - (m.ball || m.won ? 0 : 1)); i++){ ctx.globalAlpha = 0.85; heroAt(80 - i*30, SL_GROUND, 30, 1, false, 0, false); ctx.globalAlpha = 1; }
     mgDrawParts();
@@ -2699,7 +2782,7 @@ MINIS.space = { name:'Vesmír', icon:'🚀', unit:'💥', ctrl:'lr', music:'nigh
     ctx.globalAlpha = 1;
     const v = mgView(400, 720); mgBegin(v);
     ctx.fillStyle = '#ffd23f'; for(const s of m.shots){ ctx.fillRect(s.x - 3, s.y - 10, 6, 16); }
-    for(const e of m.ens) drawEnemyAt(e.x, e.y, 1, TNOW + e.ph, 1, e.alive ? 1 : .35, false);
+    for(const e of m.ens) drawEnemyAt(e.x, e.y, 1, TNOW + e.ph, 1, e.alive ? 1 : .35, false, false);
     for(const d of m.drops) drawCoin(d.x, d.y, TNOW);
     trailDraw();
     // raketa
@@ -2709,7 +2792,7 @@ MINIS.space = { name:'Vesmír', icon:'🚀', unit:'💥', ctrl:'lr', music:'nigh
     ctx.beginPath(); ctx.moveTo(x - 26, y + 36); ctx.quadraticCurveTo(x - 30, y - 6, x, y - 30); ctx.quadraticCurveTo(x + 30, y - 6, x + 26, y + 36); ctx.closePath(); ctx.fill(); ctx.stroke();
     ctx.fillStyle = '#ff5a4f'; ctx.beginPath(); ctx.moveTo(x - 26, y + 14); ctx.lineTo(x - 42, y + 40); ctx.lineTo(x - 24, y + 36); ctx.closePath(); ctx.fill(); ctx.stroke();
     ctx.beginPath(); ctx.moveTo(x + 26, y + 14); ctx.lineTo(x + 42, y + 40); ctx.lineTo(x + 24, y + 36); ctx.closePath(); ctx.fill(); ctx.stroke();
-    heroAt(x, y - 8, 54, 1, false);
+    heroAt(x, y - 8, 54, 1, false, 0, true, false);
     mgDrawParts();
     drawPaper();
   }
@@ -3251,6 +3334,7 @@ function shopLoop(){
   if(im && im.complete && im.naturalWidth){
     const ar = im.naturalWidth/im.naturalHeight; let h = 170, w = h*ar; if(w > 220){ w = 220; h = w/ar; }
     const hop = Math.max(0, Math.sin(t*3))*-26;
+    c.save(); c.translate(pc.width/2, pc.height - 46); c.scale(1 + hop/120, 1 + hop/120); groundShadow(c, w); c.restore();
     c.save(); c.translate(pc.width/2, pc.height - 48 + hop);
     if(EQ.trail){ c.globalAlpha = 0.9; for(let i=0; i<5; i++){ const x = -w*0.6 - i*22, y = -20 - Math.sin(t*4 + i)*10; c.fillStyle = EQ.trail === 'duha' ? `hsl(${i*70},90%,62%)` : EQ.trail === 'srdicka' ? '#ff5a7a' : '#ffd23f'; c.beginPath(); c.arc(x, y, 9 - i, 0, Math.PI*2); c.fill(); } c.globalAlpha = 1; }
     drawHero(c, im, w, h, t, hop < -2);
@@ -3303,8 +3387,9 @@ function runProcess(){
   warn.hidden = true; $('#bSaveChar').disabled = false;
   const maxH = (edKind === 'coin' ? 200 : pc.height - 90), maxW = pc.width - 60;
   const s = Math.min(maxH/edResult.height, maxW/edResult.width);
-  const w = edResult.width*s, h = edResult.height*s;
-  x.drawImage(edResult, (pc.width-w)/2, edKind === 'coin' ? (pc.height-60-h)/2 : pc.height-60-h+6, w, h);
+  const w = edResult.width*s, h = edResult.height*s, by = edKind === 'coin' ? (pc.height-60+h)/2 : pc.height-54;
+  if(edKind !== 'coin'){ x.save(); x.translate(pc.width/2, pc.height-56); x.fillStyle = 'rgba(30,25,20,.22)'; x.beginPath(); x.ellipse(0, 0, w*0.42, Math.max(4, w*0.08), 0, 0, Math.PI*2); x.fill(); x.restore(); }
+  draw3D(x, edResult, pc.width/2, by, w, h);
 }
 function saveChar(){
   if(!edResult) return;
