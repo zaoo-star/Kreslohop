@@ -2944,7 +2944,7 @@ MINIS.penalty = { name:'Penalty', icon:'⚽', unit:'⚽', ctrl:'drag', say:'Pena
   up(p){
     const m = MG; if(!m.aim) return; const a = m.aim; m.aim = null;
     const dy = p.y - a.y, dx = p.x - a.x; if(dy > -40) return;
-    const tx = 200 + dx*(340/Math.max(60, -dy)) * 1.0, len = Math.hypot(dx, dy), dt = Math.max(0.06, TNOW - a.t);
+    const tx = penAimX(a, p), len = Math.hypot(dx, dy), dt = Math.max(0.06, TNOW - a.t);
     const h = Math.min(250, len*0.3 + (len/dt)*0.015);
     m.ball = { t:0, tx: Math.max(-40, Math.min(440, tx)), h }; sfx.kick();
     const lvl = Math.min(1, m.score/20);
@@ -2995,7 +2995,11 @@ MINIS.penalty = { name:'Penalty', icon:'⚽', unit:'⚽', ctrl:'drag', say:'Pena
     ctx.fillStyle = '#fff'; ctx.strokeStyle = OUT; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(0, 0, 22, 0, Math.PI*2); ctx.fill(); ctx.stroke();
     ctx.fillStyle = OUT; ctx.beginPath(); for(let k=0; k<5; k++){ const a = k/5*Math.PI*2 - Math.PI/2; ctx.lineTo(Math.cos(a)*8, Math.sin(a)*8); } ctx.closePath(); ctx.fill();
     ctx.restore();
-    if(m.aim && MG.ptr){ ctx.strokeStyle = 'rgba(255,255,255,.85)'; ctx.lineWidth = 6; ctx.setLineDash([10,10]); ctx.beginPath(); ctx.moveTo(m.aim.x, m.aim.y); ctx.lineTo(MG.ptr.x, MG.ptr.y); ctx.stroke(); ctx.setLineDash([]); }
+    if(m.aim && MG.ptr && MG.ptr.y < m.aim.y - 20){   // kam míč poletí
+      const ax = Math.max(-40, Math.min(440, penAimX(m.aim, MG.ptr))), inG = ax > 84 && ax < 316;
+      ctx.strokeStyle = 'rgba(255,255,255,.85)'; ctx.lineWidth = 6; ctx.setLineDash([10,10]); ctx.beginPath(); ctx.moveTo(200, 600); ctx.lineTo(ax, 215); ctx.stroke(); ctx.setLineDash([]);
+      ctx.strokeStyle = inG ? '#ffd23f' : '#ff5a4f'; ctx.lineWidth = 5; ctx.beginPath(); ctx.arc(ax, 215, 20, 0, Math.PI*2); ctx.moveTo(ax - 28, 215); ctx.lineTo(ax + 28, 215); ctx.moveTo(ax, 187); ctx.lineTo(ax, 243); ctx.stroke();
+    }
     if(!m.ball && m.resT <= 0){ ctx.font = '40px sans-serif'; ctx.textAlign = 'center'; ctx.fillText('👆', 200, 690 + Math.sin(TNOW*5)*6); }
     mgDrawParts();
     drawPaper();
@@ -3003,7 +3007,8 @@ MINIS.penalty = { name:'Penalty', icon:'⚽', unit:'⚽', ctrl:'drag', say:'Pena
   }
 };
 
-function penEndY(b){ return 252 - b.h*0.5; }   // kde míč skončí (výška nad brankovou čarou)
+function penEndY(b){ return 252 - b.h*0.5; }
+function penAimX(a, p){ const dx = p.x - a.x, dy = p.y - a.y; return 200 + dx*(340/Math.max(60, -dy))*0.75; }   // kde míč skončí (výška nad brankovou čarou)
 
 /* ---------- 🏀 Koš ---------- */
 MINIS.basket = { name:'Koš', icon:'🏀', unit:'🏀', ctrl:'drag', say:'Koš. Švihni prstem od míče nahoru a hoď ho do koše.',
