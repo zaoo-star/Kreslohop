@@ -2892,18 +2892,19 @@ MINIS.maze = { name:'Bludiště', icon:'🟡', unit:'🪙', ctrl:'dpad', music:'
 };
 
 /* ---------- 🐍 Had ---------- */
-MINIS.snake = { name:'Had', icon:'🐍', unit:'🍎', ctrl:'dpad', say:'Had. Řiď hada a sbírej mince. Nenaraz do zdi.',
+MINIS.snake = { name:'Had', icon:'🐍', unit:'🍎', ctrl:'dpad', say:'Had. Řiď hada a sbírej mince. Zdí můžeš projít, jen nenaraz sám do sebe.',
   start(m){ m.cols = VW < VH ? 12 : 18; m.rows = VW < VH ? 16 : 11; snakeReset(m); },
   move(p){ const m = MG, dx = p.x - p.lx, dy = p.y - p.ly; if(Math.hypot(dx, dy) > 30){ snakeTurn(m, Math.abs(dx) > Math.abs(dy) ? [Math.sign(dx), 0] : [0, Math.sign(dy)]); p.lx = p.x; p.ly = p.y; } },
   down(p){ p.lx = p.x; p.ly = p.y; },
   step(m, dt){
     if(inp.left) snakeTurn(m, [-1,0]); if(inp.right) snakeTurn(m, [1,0]); if(inp.up) snakeTurn(m, [0,-1]); if(inp.down) snakeTurn(m, [0,1]);
     m.acc += dt;
-    const iv = Math.max(0.1, 0.22 - m.body.length*0.005);
+    const iv = Math.max(0.2, 0.34 - m.body.length*0.004);   // pomalejší had, zrychluje jen trochu
     while(m.acc >= iv && state === 'play'){
       m.acc -= iv; m.dir = m.want;
-      const h = m.body[0], nx = h[0] + m.dir[0], ny = h[1] + m.dir[1];
-      if(nx < 0 || ny < 0 || nx >= m.cols || ny >= m.rows || m.body.some(b => b[0] === nx && b[1] === ny)){
+      const h = m.body[0];
+      const nx = (h[0] + m.dir[0] + m.cols) % m.cols, ny = (h[1] + m.dir[1] + m.rows) % m.rows;   // zdí projde na druhou stranu
+      if(m.body.slice(0, -1).some(b => b[0] === nx && b[1] === ny)){
         mgHurt(); if(state === 'play') snakeReset(m); return;
       }
       m.body.unshift([nx, ny]);
@@ -2919,7 +2920,7 @@ MINIS.snake = { name:'Had', icon:'🐍', unit:'🍎', ctrl:'dpad', say:'Had. Ři
     MG.view = { sc, ox:(VW - W*sc)/2, oy: top + Math.max(0, (avail - H*sc)/2) };
     skyFill('#3f7a34'); mgBegin(MG.view);
     for(let y=0; y<m.rows; y++) for(let x=0; x<m.cols; x++){ ctx.fillStyle = (x + y) % 2 ? '#7ccf5f' : '#72c455'; ctx.fillRect(x*40, y*40, 40.5, 40.5); }
-    ctx.strokeStyle = OUT; ctx.lineWidth = 4; wrect(ctx, 0, 0, W, H, 3); ctx.stroke();
+    ctx.strokeStyle = OUT; ctx.lineWidth = 4; ctx.setLineDash([14, 12]); ctx.strokeRect(0, 0, W, H); ctx.setLineDash([]);   // přerušovaná = dá se projít
     drawCoin((m.food[0]+.5)*40, (m.food[1]+.5)*40, TNOW);
     trailDraw();
     for(let i=m.body.length-1; i>0; i--){
