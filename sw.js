@@ -1,5 +1,5 @@
 // Kreslohop – offline cache. Při změně hry zvyš číslo verze, ať se stáhne nová.
-const CACHE = 'kreslohop-v6';
+const CACHE = 'kreslohop-v7';
 const FILES = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png'];
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(FILES)).then(() => self.skipWaiting()));

@@ -2501,7 +2501,7 @@ MINIS.fly = { name:'Létání', icon:'🐦', unit:'🏁', ctrl:'tap', say:'Lét�
     }
     for(const c of m.cns) if(!c.taken && Math.abs(c.x - hx) < 30 && Math.abs(c.y - m.y) < 34){ c.taken = true; mgCoin(); }
     for(const e of m.ens){ e.y = e.y0 + Math.sin(MG.t*2 + e.ph)*60;
-      if(e.alive && Math.abs(e.x - hx) < 34 && Math.abs(e.y - 20 - m.y) < 36) mgHurt(); }
+      if(e.alive && Math.abs(e.x - hx) < 34 && Math.abs(e.y - m.y) < 36) mgHurt(); }
     m.obs = m.obs.filter(o => o.x > m.dist - 200); m.cns = m.cns.filter(c => c.x > m.dist - 200); m.ens = m.ens.filter(e => e.x > m.dist - 200);
     trailTick(hx, m.y + 20, dt, true);
   },
@@ -2655,9 +2655,9 @@ MINIS.sling = { name:'Prak', icon:'🎯', unit:'🏰', ctrl:'drag', say:'Prak. N
   down(p){ const m = MG; if(m.ball || m.won) return; if(Math.hypot(p.x - SL_REST.x, p.y - SL_REST.y) < 140) m.aim = true; },
   up(p){
     const m = MG; if(!m.aim) return; m.aim = false;
-    const pull = slPull(p), dx = SL_REST.x - pull.x, dy = SL_REST.y - pull.y;
-    if(Math.hypot(dx, dy) < 20) return;
-    m.ball = { x:pull.x, y:pull.y, vx:dx*7.2, vy:dy*7.2, r:24, t:0, rot:0 };
+    const pull = slPull(p);
+    if(pull.len < 20) return;
+    m.ball = { x:pull.x, y:pull.y, vx:pull.vx, vy:pull.vy, r:24, t:0, rot:0 };
     m.shots--; MG.hearts = m.shots; P.hearts = m.shots; updateHud();
     if(!playVoice('hop', 0)) tone(500, 900, .2, 'triangle', .14);
   },
@@ -2665,8 +2665,8 @@ MINIS.sling = { name:'Prak', icon:'🎯', unit:'🏰', ctrl:'drag', say:'Prak. N
     if(m.won){ m.won += dt; if(m.won > 1.4 && state === 'play') slingWin(m); }
     const b = m.ball;
     if(b){
-      b.t += dt; b.vy += SL_G*dt; b.x += b.vx*dt; b.y += b.vy*dt; b.rot += b.vx*dt/30;
-      if(b.y + b.r > SL_GROUND){ b.y = SL_GROUND - b.r; b.vy *= -0.35; b.vx *= 0.7; if(Math.abs(b.vy) < 60) b.vy = 0; }
+      b.t += dt; b.vy += SL_G*dt; b.x += b.vx*dt; b.y += b.vy*dt; b.rot += b.vx*dt/30;   // stejný výpočet jako tečkovaný náhled
+      if(b.y + b.r > SL_GROUND && b.vy > 0){ b.y = SL_GROUND - b.r; b.vy *= -0.35; b.vx *= 0.7; if(Math.abs(b.vy) < 60) b.vy = 0; }
       for(const x of m.boxes) if(x.st && circRect(b.x, b.y, b.r, x.x, x.y, x.w, x.h) && Math.hypot(b.vx, b.vy) > 120){
         x.st = false; x.vx = b.vx*0.6 + 60; x.vy = -220; x.vr = (Math.random()-.5)*10; sfx.bump(); b.vx *= 0.55; b.vy *= -0.3;
       }
@@ -2714,9 +2714,9 @@ MINIS.sling = { name:'Prak', icon:'🎯', unit:'🏰', ctrl:'drag', say:'Prak. N
     trailDraw();
     const pull = m.aim && MG.ptr ? slPull(MG.ptr) : SL_REST;
     if(m.aim && MG.ptr){ // náhled dráhy
-      let x = pull.x, y = pull.y, vx = (SL_REST.x - pull.x)*7.2, vy = (SL_REST.y - pull.y)*7.2;
+      let x = pull.x, y = pull.y, vx = pull.vx, vy = pull.vy;
       ctx.fillStyle = 'rgba(255,255,255,.9)';
-      for(let i=0; i<26; i++){ for(let k=0; k<4; k++){ vy += SL_G*0.012; x += vx*0.012; y += vy*0.012; } if(y > SL_GROUND) break; ctx.beginPath(); ctx.arc(x, y, 4, 0, Math.PI*2); ctx.fill(); }
+      for(let i=0; i<26; i++){ for(let k=0; k<4; k++){ vy += SL_G*0.012; x += vx*0.012; y += vy*0.012; } if(y > SL_GROUND - 24 && vy > 0) break; ctx.beginPath(); ctx.arc(x, y, 4, 0, Math.PI*2); ctx.fill(); }
     }
     if(!m.ball && m.shots > 0 && !m.won){
       ctx.strokeStyle = '#4a2f1a'; ctx.lineWidth = 6; ctx.beginPath(); ctx.moveTo(SL_REST.x - 26, SL_REST.y - 6); ctx.lineTo(pull.x, pull.y); ctx.lineTo(SL_REST.x + 26, SL_REST.y - 6); ctx.stroke();
@@ -2730,7 +2730,13 @@ MINIS.sling = { name:'Prak', icon:'🎯', unit:'🏰', ctrl:'drag', say:'Prak. N
     if(m.won) bigText('Hurá!');
   }
 };
-function slPull(p){ let dx = p.x - SL_REST.x, dy = p.y - SL_REST.y; const L = Math.hypot(dx, dy), mx = 115; if(L > mx){ dx *= mx/L; dy *= mx/L; } return { x:SL_REST.x + dx, y:SL_REST.y + dy }; }
+function slPull(p){
+  let dx = p.x - SL_REST.x, dy = p.y - SL_REST.y; const L = Math.hypot(dx, dy), mx = 115;
+  if(L > mx){ dx *= mx/L; dy *= mx/L; }
+  // síla a směr podle celého tahu prstem; míček ale zůstane nad zemí
+  const y = Math.min(SL_REST.y + dy, SL_GROUND - 28);
+  return { x:SL_REST.x + dx, y, vx:-dx*7.2, vy:-dy*7.2, len:Math.hypot(dx, dy) };
+}
 function slKill(m, e){ if(!e.alive) return; e.alive = false; e.deadT = .4; sfx.stomp(); STATS.stomps++; mgPuff(e.x, e.y - 18, 8); mgCoin(); }
 function slingWin(m){
   state = 'done'; saveStats();
@@ -2939,7 +2945,7 @@ MINIS.penalty = { name:'Penalty', icon:'⚽', unit:'⚽', ctrl:'drag', say:'Pena
     const m = MG; if(!m.aim) return; const a = m.aim; m.aim = null;
     const dy = p.y - a.y, dx = p.x - a.x; if(dy > -40) return;
     const tx = 200 + dx*(340/Math.max(60, -dy)) * 1.0, len = Math.hypot(dx, dy), dt = Math.max(0.06, TNOW - a.t);
-    const h = Math.min(160, len*0.25 + (len/dt)*0.012);
+    const h = Math.min(250, len*0.3 + (len/dt)*0.015);
     m.ball = { t:0, tx: Math.max(-40, Math.min(440, tx)), h }; sfx.kick();
     const lvl = Math.min(1, m.score/20);
     m.gTarget = Math.random() < 0.2 + lvl*0.5 ? m.ball.tx : 80 + Math.random()*240;
@@ -2951,7 +2957,10 @@ MINIS.penalty = { name:'Penalty', icon:'⚽', unit:'⚽', ctrl:'drag', say:'Pena
       const b = m.ball; b.t += dt/0.62;
       const sp = (140 + lvl*260)*dt; m.gx += Math.max(-sp, Math.min(sp, m.gTarget - m.gx)); m.dive = Math.max(-1, Math.min(1, (m.gTarget - 200)/120));
       if(b.t >= 1){
-        const reach = 38 + lvl*30, inGoal = b.tx > 78 && b.tx < 322 && b.h < 128, saved = inGoal && Math.abs(b.tx - m.gx) < reach && b.h < 112;
+        // stejná pozice, jakou vidí hráč: konec dráhy míče
+        const endY = penEndY(b), reach = 38 + lvl*30;
+        const inGoal = b.tx > 84 && b.tx < 316 && endY > 142 && endY < 262;
+        const saved = inGoal && Math.abs(b.tx - m.gx) < reach && endY > 262 - 100;
         if(saved){ m.res = 'Chytil!'; sfx.bump(); mgHurt(); }
         else if(inGoal){ m.res = 'GÓL!'; m.score++; mgCoin(); sfx.goal(); updateHud(); if(m.score >= 10) award('kanonyr'); }
         else { m.res = 'Vedle!'; tone(300, 150, .3, 'triangle', .12); mgHurt(); }
@@ -2980,7 +2989,7 @@ MINIS.penalty = { name:'Penalty', icon:'⚽', unit:'⚽', ctrl:'drag', say:'Pena
     // míč
     const b = m.ball || (m.resT > 0 ? m.last : null);
     let bx = 200, by = 600, bs = 1;
-    if(b){ const t = Math.min(1, b.t); bx = 200 + (b.tx - 200)*t; by = 600 - (600 - 250)*t - Math.sin(t*Math.PI)*b.h*0.6 - b.h*0.5*t; bs = 1 - t*0.5; }
+    if(b){ const t = Math.min(1, b.t), ey = penEndY(b); bx = 200 + (b.tx - 200)*t; by = 600 + (ey - 600)*t - Math.sin(t*Math.PI)*(40 + b.h*0.2); bs = 1 - t*0.5; }
     heroAt(140, 650, 82, 1, !!m.ball);
     ctx.save(); ctx.translate(bx, by); ctx.scale(bs, bs); ctx.rotate(TNOW*(m.ball ? 12 : 0));
     ctx.fillStyle = '#fff'; ctx.strokeStyle = OUT; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(0, 0, 22, 0, Math.PI*2); ctx.fill(); ctx.stroke();
@@ -2993,6 +3002,8 @@ MINIS.penalty = { name:'Penalty', icon:'⚽', unit:'⚽', ctrl:'drag', say:'Pena
     if(m.resT > 0) bigText(m.res, m.res === 'GÓL!' ? '#ffd23f' : '#ffffff');
   }
 };
+
+function penEndY(b){ return 252 - b.h*0.5; }   // kde míč skončí (výška nad brankovou čarou)
 
 /* ---------- 🏀 Koš ---------- */
 MINIS.basket = { name:'Koš', icon:'🏀', unit:'🏀', ctrl:'drag', say:'Koš. Švihni prstem od míče nahoru a hoď ho do koše.',
@@ -3048,7 +3059,8 @@ MINIS.basket = { name:'Koš', icon:'🏀', unit:'🏀', ctrl:'drag', say:'Koš. 
     ctx.strokeStyle = 'rgba(255,255,255,.9)'; ctx.lineWidth = 2;
     for(let k=0; k<5; k++){ ctx.beginPath(); ctx.moveTo(292 + k*14, hy); ctx.lineTo(300 + k*10, hy + 46); ctx.stroke(); }
     ctx.beginPath(); ctx.moveTo(298, hy + 22); ctx.lineTo(344, hy + 22); ctx.moveTo(300, hy + 44); ctx.lineTo(340, hy + 44); ctx.stroke();
-    ctx.strokeStyle = '#ff5a1f'; ctx.lineWidth = 6; ctx.beginPath(); ctx.moveTo(288, hy); ctx.lineTo(362, hy); ctx.stroke();
+    ctx.strokeStyle = '#7a7f86'; ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(350, hy); ctx.lineTo(362, hy); ctx.stroke();
+    ctx.strokeStyle = '#ff5a1f'; ctx.lineWidth = 6; ctx.beginPath(); ctx.moveTo(288, hy); ctx.lineTo(352, hy); ctx.stroke();
     heroAt(60, 642, 90, 1, !!m.ball);
     const b = m.ball, bx = b ? b.x : 90, by = b ? b.y : 590;
     ctx.save(); ctx.translate(bx, by); ctx.rotate(b ? b.t*8 : 0);
