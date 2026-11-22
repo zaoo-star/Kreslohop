@@ -143,12 +143,12 @@
   #dpad .tb.bomb{left:auto;right:calc(20px + env(safe-area-inset-right));bottom:calc(30px + env(safe-area-inset-bottom));width:112px;height:112px;border-radius:50%;font-size:52px;background:rgba(255,122,46,.85)}
   #dpad .tb.on{background:rgba(255,210,63,.95)}
   .games{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:4px 0 6px}
-  .game{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;min-height:124px;font:inherit;color:#23201c;
+  .game{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;min-height:104px;font:inherit;color:#23201c;
     border:3px solid #23201c;border-radius:20px;cursor:pointer;padding:8px 4px;box-shadow:0 4px 0 #23201c}
   .game:active{transform:translateY(3px);box-shadow:0 1px 0 #23201c}
-  .game .gi{font-size:54px;line-height:1.05}
+  .game .gi{font-size:46px;line-height:1.05}
   .game .tl{font-size:16px;font-weight:900}
-  .game.g1{background:#5cc94a}.game.g2{background:#8fd3ff}.game.g3{background:#ff9a55}
+  
   .wallet{font-size:26px;font-weight:900;background:#ffd23f;border:3px solid #23201c;border-radius:14px;padding:6px 12px}
   #shopPrev{width:100%;height:auto;border:3px solid #23201c;border-radius:20px;display:block;background:#8fd3ff;margin:8px 0 14px}
   .shopgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:10px}
@@ -220,11 +220,7 @@
     </div>
     <div class="hero" id="heroBox" role="button" tabindex="0" aria-label="Moje postavička"><img id="heroImg" alt=""></div>
     <div class="charname" id="heroName"></div>
-    <div class="games">
-      <button class="game g1" id="gRun" aria-label="Skákání po levelech"><span class="gi">🏃</span><span class="tl">Skákání</span></button>
-      <button class="game g2" id="gTower" aria-label="Věž. Skákej co nejvýš"><span class="gi">🏢</span><span class="tl" id="gTowerLbl">Věž</span></button>
-      <button class="game g3" id="gBomb" aria-label="Bomby"><span class="gi">💣</span><span class="tl" id="gBombLbl">Bomby</span></button>
-    </div>
+    <div class="games" id="games"></div>
 
     <div class="label"><span class="lico" aria-hidden="true">🗺️</span></div>
     <div class="lvgrid" id="levels"></div>
@@ -692,6 +688,12 @@ const STICKERS = [
   { id:'vez100',   e:'🏙️', n:'Mrakodrap',        d:'Ve věži vyskákej do 100. patra' },
   { id:'bomby3',   e:'💣', n:'Bombař',           d:'V bombách projdi 3 kola' },
   { id:'bomby6',   e:'💥', n:'Ohňostroj',        d:'V bombách projdi 6 kol' },
+  { id:'pilot',    e:'🐦', n:'Pilot',            d:'V létání prolet 20 věží' },
+  { id:'sprinter', e:'👟', n:'Sprinter',         d:'V běhu uběhni 300 metrů' },
+  { id:'prakovnik',e:'🎯', n:'Střelec',          d:'Prakem zboř 3 hrady' },
+  { id:'kanonyr',  e:'⚽', n:'Kanonýr',          d:'V penaltách dej 10 gólů' },
+  { id:'kosik',    e:'🏀', n:'Košíkář',          d:'Hoď 10 košů' },
+  { id:'hadik',    e:'🐍', n:'Dlouhý had',       d:'V hadovi sněz 15 mincí' },
   { id:'malir',    e:'✏️', n:'Malíř',            d:'Nakresli vlastní postavičku' },
   { id:'prisera',  e:'👾', n:'Tvůrce příšer',    d:'Nakresli vlastní příšerku' },
   { id:'mincovna', e:'🌟', n:'Mincovna',         d:'Nakresli vlastní minci' },
@@ -2318,7 +2320,689 @@ function bombOver(){
   ], '💔', 'Došla srdíčka. Došel jsi do ' + st + '. kola.');
 }
 
+/* =====================================================================
+   MINIHRY – společný základ
+   ===================================================================== */
+const MINIS = {};
+let MINI = null, MG = null;
+function startMini(id, keep){
+  MODE = 'mini'; G = null; TW = null; BM = null; CUR_TH = THEMES.meadow; setArtImgs();
+  MINI = MINIS[id]; P = makePlayer();
+  MG = { id, t:0, hearts:3, inv:0, coins: keep ? keep.coins : 0, score: keep ? keep.score : 0, shake:0, parts:[], ptr:null, tap:0, view:{ sc:1, ox:0, oy:0 } };
+  MINI.start(MG, keep);
+  P.hearts = MG.hearts;
+  startPlay(MINI.say);
+}
+function mgView(vw, vh){ const sc = Math.min(VW/vw, VH/vh); MG.view = { sc, ox:(VW - vw*sc)/2, oy:(VH - vh*sc)/2, w:vw, h:vh }; return MG.view; }
+function mgBegin(v, shake=true){ const sh = shake && MG.shake > 0 ? (Math.random()-.5)*8 : 0; ctx.setTransform(DPR*v.sc, 0, 0, DPR*v.sc, (v.ox + sh)*DPR, v.oy*DPR); }
+function mgWorld(x, y){ const v = MG.view; return { x:(x - v.ox)/v.sc, y:(y - v.oy)/v.sc }; }
+function mgHurt(){
+  if(MG.inv > 0 || state !== 'play') return;
+  MG.hearts--; P.hearts = MG.hearts; MG.inv = 1.5; MG.shake = 0.3; sfx.hurt(); updateHud();
+  if(MG.hearts <= 0) mgOver();
+}
+function mgCoin(n=1){
+  MG.coins += n; STATS.coins += n; sfx.coin(); updateHud();
+  if(STATS.coins >= 100) award('mince100'); if(STATS.coins >= 500) award('mince500');
+}
+function mgPuff(x, y, n=6, c='rgba(255,255,255,.9)'){ for(let k=0; k<n; k++) MG.parts.push({ x, y, vx:(Math.random()-.5)*280, vy:(Math.random()-.7)*240, life:.45, c }); }
+function mgParts(dt){ for(const q of MG.parts){ q.life -= dt; q.x += q.vx*dt; q.y += q.vy*dt; } MG.parts = MG.parts.filter(q => q.life > 0); }
+function mgDrawParts(){ for(const q of MG.parts){ ctx.globalAlpha = Math.min(1, q.life*2.5); ctx.fillStyle = q.c; ctx.beginPath(); ctx.arc(q.x, q.y, 3 + q.life*12, 0, Math.PI*2); ctx.fill(); } ctx.globalAlpha = 1; }
+function mgRecord(){ return store.get('kh_rec_' + MG.id, 0); }
+function mgOver(extra){
+  state = 'over'; sfx.lose(); saveStats();
+  const rec = mgRecord(), best = MG.score > rec;
+  if(best) store.set('kh_rec_' + MG.id, MG.score);
+  const id = MG.id;
+  showMsg(MINI.name, MINI.unit + ' ' + MG.score + '   🪙 ' + MG.coins + (best ? '   🏆 nový rekord!' : '   🏆 ' + rec), [
+    { icon:'↻', label:'Znovu', primary:true, fn: () => startMini(id) },
+    { icon:'🏠', label:'Domů', fn: toMenu }
+  ], best ? '🏆' : MINI.icon, (extra || 'Konec hry.') + ' Máš ' + MG.score + '.' + (best ? ' To je nový rekord!' : ''));
+}
+function mgStepCommon(dt){
+  MG.t += dt; if(MG.inv > 0) MG.inv -= dt; if(MG.shake > 0) MG.shake -= dt; MG.tap -= dt;
+  mgParts(dt);
+}
+// postavička: (x, spodek) a výška
+function heroAt(x, by, h, face=1, moving=false, rot=0, blink=true){
+  const im = P.img, ar = (im.naturalWidth || 100)/(im.naturalHeight || 120);
+  let w = h*ar; if(w > h*1.3){ w = h*1.3; h = w/ar; }
+  if(blink && MG.inv > 0 && Math.floor(MG.inv*12) % 2 === 0) return w;
+  ctx.save(); ctx.translate(x, by); ctx.rotate(rot); ctx.scale(face, 1); drawHero(ctx, im, w, h, TNOW, moving); ctx.restore();
+  return w;
+}
+function skyFill(c){ ctx.setTransform(DPR, 0, 0, DPR, 0, 0); ctx.fillStyle = c; ctx.fillRect(0, 0, VW, VH); }
+function cloudsBg(off, s){
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  for(let i=0; i<5; i++){
+    const cx = ((hash(i+2)*VW*1.6 - off*(0.2 + hash(i)*0.2)) % (VW*1.6) + VW*1.6) % (VW*1.6) - VW*0.3, cy = 40 + hash(i+9)*VH*0.45;
+    for(const pass of [0,1]){ ctx.beginPath();
+      for(const [dx,dy,r] of [[0,0,24],[30,-14,30],[62,-2,22]]){ ctx.moveTo(cx+(dx+r)*s, cy+dy*s); ctx.arc(cx+dx*s, cy+dy*s, r*s, 0, Math.PI*2); }
+      if(pass === 0){ ctx.strokeStyle = OUT; ctx.lineWidth = 5; ctx.stroke(); } else { ctx.fillStyle = '#fff'; ctx.fill(); } }
+  }
+}
+function groundStrip(x0, x1, y, depth){
+  const tex = tileTex(THEMES.meadow);
+  for(let x = Math.floor(x0/T)*T; x < x1; x += T){ ctx.drawImage(tex.body, x, y, T+0.6, depth); ctx.drawImage(tex.top, x, y, T+0.6, 20); }
+  ctx.strokeStyle = OUT; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(x0, y); ctx.lineTo(x1, y); ctx.stroke();
+}
+function bigText(txt, col='#ffd23f'){
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  const fs = Math.min(VW/5, 90);
+  ctx.font = `900 ${fs}px "Trebuchet MS",sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.lineWidth = 9; ctx.strokeStyle = OUT; ctx.strokeText(txt, VW/2, VH*0.32); ctx.fillStyle = col; ctx.fillText(txt, VW/2, VH*0.32);
+}
+function circRect(cx, cy, r, x, y, w, h){ const nx = Math.max(x, Math.min(cx, x+w)), ny = Math.max(y, Math.min(cy, y+h)); return (cx-nx)**2 + (cy-ny)**2 < r*r; }
+
+/* ---------- 🐦 Létání ---------- */
+MINIS.fly = { name:'Létání', icon:'🐦', unit:'🏁', ctrl:'tap', say:'Létání. Ťukej a leť mezi věžemi.',
+  start(m){ Object.assign(m, { y:300, vy:0, dist:0, obs:[], cns:[], ens:[], next:700, go:false }); },
+  step(m, dt){
+    if(!m.go){ m.y = 300 + Math.sin(MG.t*3)*12; if(m.tap > 0){ m.go = true; } else return; }   // čeká na první ťuknutí
+    const speed = 165 + Math.min(120, m.score*4);
+    if(m.tap > 0){ m.tap = 0; m.vy = -470; sfx.bounce(); }
+    m.vy = Math.min(650, m.vy + 1450*dt); m.y += m.vy*dt;
+    if(m.y < 30){ m.y = 30; m.vy = 0; }
+    if(m.y > 545){ m.y = 545; m.vy = -380; }
+    m.dist += speed*dt;
+    while(m.next < m.dist + 1000){
+      const gap = Math.max(175, 235 - m.score*2), gy = 150 + Math.random()*(330 - 0) ;
+      m.obs.push({ x:m.next, gy: Math.min(560 - gap/2 - 30, Math.max(gap/2 + 40, gy)), gap, passed:false });
+      if(Math.random() < 0.6) m.cns.push({ x:m.next + 35, y:m.obs[m.obs.length-1].gy, taken:false });
+      if(m.score > 3 && Math.random() < 0.5) m.ens.push({ x:m.next + 175, y0:150 + Math.random()*300, ph:Math.random()*6, alive:true });
+      m.next += 330;
+    }
+    const hx = m.dist + 120, r = 20;
+    for(const o of m.obs){
+      if(hx + r > o.x && hx - r < o.x + 70 && (m.y - r < o.gy - o.gap/2 || m.y + r > o.gy + o.gap/2)) mgHurt();
+      if(!o.passed && o.x + 70 < hx - r){ o.passed = true; m.score++; updateHud(); if(m.score >= 20) award('pilot'); }
+    }
+    for(const c of m.cns) if(!c.taken && Math.abs(c.x - hx) < 30 && Math.abs(c.y - m.y) < 34){ c.taken = true; mgCoin(); }
+    for(const e of m.ens){ e.y = e.y0 + Math.sin(MG.t*2 + e.ph)*60;
+      if(e.alive && Math.abs(e.x - hx) < 34 && Math.abs(e.y - 20 - m.y) < 36) mgHurt(); }
+    m.obs = m.obs.filter(o => o.x > m.dist - 200); m.cns = m.cns.filter(c => c.x > m.dist - 200); m.ens = m.ens.filter(e => e.x > m.dist - 200);
+    trailTick(hx, m.y + 20, dt, true);
+  },
+  render(m){
+    skyFill('#8fd3ff'); cloudsBg(m.dist, 1);
+    const v = mgView(360, 600); const W = VW/v.sc;
+    v.ox = 0; mgBegin(v);
+    ctx.save(); ctx.translate(-m.dist, 0);
+    for(const o of m.obs){
+      for(const [y0, y1] of [[-400, o.gy - o.gap/2], [o.gy + o.gap/2, 900]]){
+        ctx.fillStyle = '#e8743b'; ctx.fillRect(o.x, y0, 70, y1 - y0); hatch(ctx, o.x, y0, 70, y1 - y0, '#a8481a', o.x|0);
+        ctx.fillStyle = '#ffcf33'; const cap = y0 < 0 ? y1 - 22 : y0; ctx.fillRect(o.x - 6, cap, 82, 22);
+        ctx.strokeStyle = OUT; ctx.lineWidth = 3; wrect(ctx, o.x, y0, 70, y1 - y0, o.x|0); ctx.stroke(); wrect(ctx, o.x - 6, cap, 82, 22, (o.x|0) + 9); ctx.stroke();
+      }
+    }
+    for(const c of m.cns) if(!c.taken) drawCoin(c.x, c.y, TNOW);
+    for(const e of m.ens) drawEnemyAt(e.x, e.y + 20, -1, TNOW + e.ph, 1, 1, false);
+    trailDraw();
+    heroAt(m.dist + 120, m.y + 28, 58, 1, true, Math.max(-0.5, Math.min(0.6, m.vy/900)));
+    mgDrawParts();
+    if(!m.go){ ctx.font = '54px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('👆', m.dist + 120, 400 + Math.sin(TNOW*5)*8); }
+    ctx.restore();
+    ctx.fillStyle = '#5cc94a'; ctx.fillRect(0, 575, W, 400); ctx.strokeStyle = OUT; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(0, 575); ctx.lineTo(W, 575); ctx.stroke();
+    drawPaper();
+  }
+};
+
+/* ---------- 🏃 Nekonečný běh ---------- */
+MINIS.runner = { name:'Běh', icon:'🏃', unit:'📏', ctrl:'tap', say:'Běh. Postavička běží sama, ťukni a skoč.',
+  start(m){ Object.assign(m, { y:500, vy:0, onG:true, air:1, dist:0, obs:[], cns:[], next:1000 }); },
+  step(m, dt){
+    const speed = 240 + Math.min(180, m.dist/60);
+    if(m.tap > 0){ if(m.onG){ m.tap = 0; m.vy = -800; m.onG = false; sfx.jump(); } else if(m.air > 0){ m.tap = 0; m.air--; m.vy = -700; sfx.bounce(); } }
+    const prevY = m.y;
+    m.vy = Math.min(1200, m.vy + 2200*dt); m.y += m.vy*dt;
+    const hx = m.dist + 110, hw = 30;
+    let floor = 500;
+    for(const o of m.obs) if(o.type === 'box' && hx + hw/2 > o.x && hx - hw/2 < o.x + o.w && prevY <= o.y - o.h + 2) floor = Math.min(floor, o.y - o.h);
+    if(m.y >= floor){ m.y = floor; m.vy = 0; m.onG = true; m.air = 1; } else m.onG = false;
+    m.dist += speed*dt; m.score = Math.floor(m.dist/40);
+    if(m.score >= 300) award('sprinter');
+    while(m.next < m.dist + 1100){
+      const r = Math.random(), x = m.next;
+      if(r < 0.35) m.obs.push({ type:'bush', x, y:500, w:44, h:30 });
+      else if(r < 0.7) m.obs.push({ type:'enemy', x, y:500, w:40, h:36, alive:true, deadT:0 });
+      else m.obs.push({ type:'box', x, y:500, w:96, h:48 + (Math.random() < .5 ? 48 : 0) });
+      const top = m.obs[m.obs.length-1].type === 'box' ? 500 - m.obs[m.obs.length-1].h - 40 : 380;
+      if(Math.random() < 0.45) for(let k=0; k<3; k++) m.cns.push({ x:x - 20 + k*40, y:top - (k === 1 ? 20 : 0), taken:false });
+      m.next += 330 + Math.random()*220 - Math.min(80, m.dist/200);
+    }
+    for(const o of m.obs){
+      if(o.type === 'enemy'){ if(o.alive) o.x -= 50*dt; else { o.deadT -= dt; continue; } }
+      const hit = hx + hw/2 > o.x + 4 && hx - hw/2 < o.x + o.w - 4 && m.y > o.y - o.h + 4 && m.y - 54 < o.y;
+      if(!hit) continue;
+      if(o.type === 'enemy'){
+        if(m.vy > 0 && prevY <= o.y - o.h + 14){ o.alive = false; o.deadT = .4; m.vy = -650; sfx.stomp(); mgPuff(o.x + 20, o.y - 10); STATS.stomps++; }
+        else mgHurt();
+      } else if(o.type === 'bush') mgHurt();
+      else if(o.type === 'box' && m.y > o.y - o.h + 6) mgHurt();
+    }
+    for(const c of m.cns) if(!c.taken && Math.abs(c.x - hx) < 28 && c.y > m.y - 70 && c.y < m.y + 10){ c.taken = true; mgCoin(); }
+    m.obs = m.obs.filter(o => o.x > m.dist - 300); m.cns = m.cns.filter(c => c.x > m.dist - 300);
+    trailTick(hx, m.y, dt, true);
+    if(state === 'play') updateHudLite();
+  },
+  render(m){
+    skyFill('#8fd3ff'); cloudsBg(m.dist, 1);
+    const v = mgView(360, 600); v.ox = 0; const W = VW/v.sc; mgBegin(v);
+    ctx.save(); ctx.translate(-m.dist, 0);
+    groundStrip(m.dist - 60, m.dist + W + 60, 500, 300);
+    for(const o of m.obs){
+      if(o.type === 'bush'){
+        ctx.fillStyle = '#3f9a36'; ctx.strokeStyle = OUT; ctx.lineWidth = 3; ctx.beginPath();
+        for(let k=0; k<3; k++) ctx.arc(o.x + 10 + k*12, o.y - 12 - (k === 1 ? 6 : 0), 14, 0, Math.PI*2); ctx.fill(); ctx.stroke();
+        ctx.fillStyle = '#ff5a4f'; for(let k=0; k<4; k++){ ctx.beginPath(); ctx.arc(o.x + 6 + k*11, o.y - 18 + (k%2)*8, 3, 0, Math.PI*2); ctx.fill(); }
+      } else if(o.type === 'enemy'){ if(o.alive || o.deadT > 0) drawEnemyAt(o.x + 20, o.y, -1, TNOW + o.x, 1, o.alive ? 1 : .35, false); }
+      else { ctx.fillStyle = '#c98a4b'; ctx.fillRect(o.x, o.y - o.h, o.w, o.h); hatch(ctx, o.x, o.y - o.h, o.w, o.h, '#8a5a2c', o.x|0);
+        ctx.strokeStyle = OUT; ctx.lineWidth = 3; wrect(ctx, o.x, o.y - o.h, o.w, o.h, o.x|0); ctx.stroke(); }
+    }
+    for(const c of m.cns) if(!c.taken) drawCoin(c.x, c.y, TNOW);
+    trailDraw();
+    heroAt(m.dist + 110, m.y + 3, 62, 1, true);
+    mgDrawParts();
+    ctx.restore();
+    drawPaper();
+  }
+};
+
+/* ---------- 🧺 Chytání ---------- */
+MINIS.catch = { name:'Chytání', icon:'🧺', unit:'🪙', ctrl:'lr', say:'Chytání. Chytej mince a uhýbej příšerkám.',
+  start(m){ Object.assign(m, { x:200, vx:0, items:[], spawn:0.5, face:1 }); },
+  step(m, dt){
+    const dir = (inp.right?1:0) - (inp.left?1:0);
+    if(m.ptr && m.ptr.down){ const d = m.ptr.x - m.x; m.vx = Math.max(-520, Math.min(520, d*10)); if(Math.abs(d) > 4) m.face = Math.sign(d); }
+    else if(dir){ m.vx += dir*2400*dt; m.face = dir; } else m.vx *= Math.pow(0.002, dt);
+    m.vx = Math.max(-420, Math.min(420, m.vx)); m.x = Math.max(30, Math.min(370, m.x + m.vx*dt));
+    const lvl = Math.min(1, MG.t/120);
+    m.spawn -= dt;
+    if(m.spawn <= 0){
+      m.spawn = 0.75 - lvl*0.4;
+      const r = Math.random();
+      m.items.push({ x:30 + Math.random()*340, y:-30, vy:140 + lvl*170 + Math.random()*60, type: r < 0.62 ? 'coin' : r < 0.97 ? 'enemy' : 'heart', rot:0 });
+    }
+    for(const it of m.items){
+      it.y += it.vy*dt; it.rot += dt*3;
+      if(it.y > 600 && it.y < 690 && Math.abs(it.x - m.x) < 40){
+        it.dead = true;
+        if(it.type === 'coin'){ m.score++; mgCoin(); mgPuff(it.x, it.y, 4, '#ffd23f'); }
+        else if(it.type === 'heart'){ MG.hearts = Math.min(5, MG.hearts+1); P.hearts = MG.hearts; sfx.power(); updateHud(); }
+        else mgHurt();
+      }
+      if(it.y > 760) it.dead = true;
+    }
+    m.items = m.items.filter(i => !i.dead);
+    trailTick(m.x, 690, dt, Math.abs(m.vx) > 30);
+  },
+  render(m){
+    skyFill('#8fd3ff'); cloudsBg(MG.t*20, 1);
+    const v = mgView(400, 720); mgBegin(v);
+    groundStrip(-200, 600, 690, 400);
+    for(const it of m.items){
+      if(it.type === 'coin') drawCoin(it.x, it.y, TNOW + it.x);
+      else if(it.type === 'heart'){ ctx.font = '40px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('❤️', it.x, it.y); }
+      else drawEnemyAt(it.x, it.y + 22, 1, TNOW + it.x, 1, 1, false);
+    }
+    trailDraw();
+    heroAt(m.x, 692, 74, m.face, Math.abs(m.vx) > 30);
+    mgDrawParts();
+    drawPaper();
+  }
+};
+
+/* ---------- 🎯 Prak ---------- */
+const SL_G = 900, SL_GROUND = 470, SL_REST = { x:160, y:370 };
+function slingLevel(m){
+  const n = m.lvl; m.boxes = []; m.ens = []; m.cns = [];
+  const towers = Math.min(4, 1 + Math.floor((n+1)/2));
+  for(let i=0; i<towers; i++){
+    const bx = 500 + i*110 + (Math.random()*20|0), hgt = 1 + Math.floor(Math.random()*Math.min(4, 1 + n));
+    for(let k=0; k<hgt; k++) m.boxes.push({ x:bx, y:SL_GROUND - (k+1)*48, w:48, h:48, st:true, vx:0, vy:0, rot:0, vr:0, life:1 });
+    m.ens.push({ x:bx + 24, y:SL_GROUND - hgt*48, alive:true, fall:false, vy:0, deadT:0 });
+    if(i < towers-1 && n >= 2 && Math.random() < 0.6) m.ens.push({ x:bx + 79, y:SL_GROUND, alive:true, fall:false, vy:0, deadT:0 });
+  }
+  for(let k=0; k<3; k++) m.cns.push({ x:380 + k*60, y:180 + Math.random()*120, taken:false });
+  m.shots = 3 + towers; MG.hearts = m.shots; P.hearts = m.shots;
+  m.ball = null; m.wait = 0; m.won = 0;
+}
+MINIS.sling = { name:'Prak', icon:'🎯', unit:'🏰', ctrl:'drag', say:'Prak. Natáhni postavičku prstem a vystřel ji na příšerky.',
+  start(m, keep){ m.lvl = keep ? keep.lvl : 1; m.score = m.lvl - 1; slingLevel(m); },
+  down(p){ const m = MG; if(m.ball || m.won) return; if(Math.hypot(p.x - SL_REST.x, p.y - SL_REST.y) < 140) m.aim = true; },
+  up(p){
+    const m = MG; if(!m.aim) return; m.aim = false;
+    const pull = slPull(p), dx = SL_REST.x - pull.x, dy = SL_REST.y - pull.y;
+    if(Math.hypot(dx, dy) < 20) return;
+    m.ball = { x:pull.x, y:pull.y, vx:dx*7.2, vy:dy*7.2, r:24, t:0, rot:0 };
+    m.shots--; MG.hearts = m.shots; P.hearts = m.shots; updateHud();
+    if(!playVoice('hop', 0)) tone(500, 900, .2, 'triangle', .14);
+  },
+  step(m, dt){
+    if(m.won){ m.won += dt; if(m.won > 1.4 && state === 'play') slingWin(m); }
+    const b = m.ball;
+    if(b){
+      b.t += dt; b.vy += SL_G*dt; b.x += b.vx*dt; b.y += b.vy*dt; b.rot += b.vx*dt/30;
+      if(b.y + b.r > SL_GROUND){ b.y = SL_GROUND - b.r; b.vy *= -0.35; b.vx *= 0.7; if(Math.abs(b.vy) < 60) b.vy = 0; }
+      for(const x of m.boxes) if(x.st && circRect(b.x, b.y, b.r, x.x, x.y, x.w, x.h) && Math.hypot(b.vx, b.vy) > 120){
+        x.st = false; x.vx = b.vx*0.6 + 60; x.vy = -220; x.vr = (Math.random()-.5)*10; sfx.bump(); b.vx *= 0.55; b.vy *= -0.3;
+      }
+      for(const e of m.ens) if(e.alive && Math.hypot(b.x - e.x, b.y - (e.y - 18)) < b.r + 20) slKill(m, e);
+      for(const c of m.cns) if(!c.taken && Math.hypot(b.x - c.x, b.y - c.y) < b.r + 14){ c.taken = true; mgCoin(); }
+      if(b.x > 1000 || b.x < -100 || b.t > 7 || (b.vy === 0 && Math.abs(b.vx) < 25)){ m.ball = null; m.wait = 0.6; }
+      trailTick(b.x, b.y, dt, true);
+    } else trailTick(0, 0, dt, false);
+    // co ztratilo podporu, padá
+    for(const x of m.boxes){
+      if(x.st){
+        const on = x.y + x.h >= SL_GROUND - 1 || m.boxes.some(o => o !== x && o.st && Math.abs(o.y - (x.y + x.h)) < 3 && o.x < x.x + x.w - 8 && o.x + o.w > x.x + 8);
+        if(!on){ x.st = false; x.vx = (Math.random()-.5)*60; x.vy = 0; x.vr = (Math.random()-.5)*4; }
+      } else { x.vy += SL_G*dt; x.x += x.vx*dt; x.y += x.vy*dt; x.rot += x.vr*dt; x.life -= dt*0.8; }
+    }
+    m.boxes = m.boxes.filter(x => x.st || (x.life > 0 && x.y < 700));
+    for(const e of m.ens){
+      if(!e.alive){ e.deadT -= dt; continue; }
+      if(!e.fall){
+        const on = e.y >= SL_GROUND - 1 || m.boxes.some(o => o.st && Math.abs(o.y - e.y) < 3 && o.x < e.x + 10 && o.x + o.w > e.x - 10);
+        if(!on){ e.fall = true; e.y0 = e.y; }
+      } else { e.vy += SL_G*dt; e.y += e.vy*dt; if(e.y - e.y0 > 40 || e.y >= SL_GROUND){ e.y = Math.min(e.y, SL_GROUND); slKill(m, e); } }
+    }
+    if(!m.won && m.ens.every(e => !e.alive)){ m.won = 0.001; sfx.win(); }
+    if(!m.ball && !m.won){
+      if(m.wait > 0) m.wait -= dt;
+      else if(m.shots <= 0){ m.score = m.lvl - 1; mgOver('Došly střely.'); }
+    }
+  },
+  render(m){
+    skyFill('#9ad7f0'); cloudsBg(0, 1);
+    const v = mgView(900, 540); mgBegin(v);
+    groundStrip(-300, 1200, SL_GROUND, 300);
+    // prak
+    ctx.strokeStyle = '#7a4d25'; ctx.lineWidth = 12; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(SL_REST.x, SL_GROUND); ctx.lineTo(SL_REST.x, SL_REST.y + 40); ctx.lineTo(SL_REST.x - 26, SL_REST.y - 6);
+    ctx.moveTo(SL_REST.x, SL_REST.y + 40); ctx.lineTo(SL_REST.x + 26, SL_REST.y - 6); ctx.stroke();
+    for(const x of m.boxes){
+      ctx.save(); ctx.translate(x.x + x.w/2, x.y + x.h/2); ctx.rotate(x.rot); ctx.globalAlpha = Math.max(0, Math.min(1, x.life*2));
+      ctx.fillStyle = '#c98a4b'; ctx.fillRect(-x.w/2, -x.h/2, x.w, x.h); hatch(ctx, -x.w/2, -x.h/2, x.w, x.h, '#8a5a2c', (x.x|0));
+      ctx.strokeStyle = OUT; ctx.lineWidth = 3; wrect(ctx, -x.w/2, -x.h/2, x.w, x.h, x.x|0); ctx.stroke(); ctx.restore();
+    }
+    for(const e of m.ens) if(e.alive || e.deadT > 0) drawEnemyAt(e.x, e.y, -1, TNOW + e.x, 1, e.alive ? 1 : Math.max(.1, e.deadT*2.5), false);
+    for(const c of m.cns) if(!c.taken) drawCoin(c.x, c.y, TNOW + c.x);
+    trailDraw();
+    const pull = m.aim && MG.ptr ? slPull(MG.ptr) : SL_REST;
+    if(m.aim && MG.ptr){ // náhled dráhy
+      let x = pull.x, y = pull.y, vx = (SL_REST.x - pull.x)*7.2, vy = (SL_REST.y - pull.y)*7.2;
+      ctx.fillStyle = 'rgba(255,255,255,.9)';
+      for(let i=0; i<26; i++){ for(let k=0; k<4; k++){ vy += SL_G*0.012; x += vx*0.012; y += vy*0.012; } if(y > SL_GROUND) break; ctx.beginPath(); ctx.arc(x, y, 4, 0, Math.PI*2); ctx.fill(); }
+    }
+    if(!m.ball && m.shots > 0 && !m.won){
+      ctx.strokeStyle = '#4a2f1a'; ctx.lineWidth = 6; ctx.beginPath(); ctx.moveTo(SL_REST.x - 26, SL_REST.y - 6); ctx.lineTo(pull.x, pull.y); ctx.lineTo(SL_REST.x + 26, SL_REST.y - 6); ctx.stroke();
+      heroAt(pull.x, pull.y + 26, 56, 1, false, 0, false);
+    }
+    if(m.ball){ const b = m.ball; heroAt(b.x, b.y + 26, 56, 1, true, b.rot*0.3, false); }
+    // zbývající střely
+    for(let i=0; i<Math.max(0, m.shots - (m.ball || m.won ? 0 : 1)); i++){ ctx.globalAlpha = 0.85; heroAt(80 - i*30, SL_GROUND, 30, 1, false, 0, false); ctx.globalAlpha = 1; }
+    mgDrawParts();
+    drawPaper();
+    if(m.won) bigText('Hurá!');
+  }
+};
+function slPull(p){ let dx = p.x - SL_REST.x, dy = p.y - SL_REST.y; const L = Math.hypot(dx, dy), mx = 115; if(L > mx){ dx *= mx/L; dy *= mx/L; } return { x:SL_REST.x + dx, y:SL_REST.y + dy }; }
+function slKill(m, e){ if(!e.alive) return; e.alive = false; e.deadT = .4; sfx.stomp(); STATS.stomps++; mgPuff(e.x, e.y - 18, 8); mgCoin(); }
+function slingWin(m){
+  state = 'done'; saveStats();
+  const lvl = m.lvl; m.score = lvl;
+  if(lvl > mgRecord()) store.set('kh_rec_sling', lvl);
+  if(lvl >= 3) award('prakovnik');
+  const keep = { lvl: lvl + 1, coins: MG.coins, score: lvl };
+  showMsg('Hrad ' + lvl + ' padl!', '🪙 ' + MG.coins, [
+    { icon:'▶', label:'Další hrad', primary:true, fn: () => startMini('sling', keep) },
+    { icon:'🏠', label:'Domů', fn: toMenu } ], '🏰', 'Hurá! Všechny příšerky jsou dole.');
+}
+
+/* ---------- 🚀 Vesmír ---------- */
+MINIS.space = { name:'Vesmír', icon:'🚀', unit:'💥', ctrl:'lr', music:'night', say:'Vesmír. Raketa střílí sama, uhýbej a sestřel příšerky.',
+  start(m){ Object.assign(m, { x:200, vx:0, shots:[], ens:[], drops:[], fire:0, spawn:1, wave:0 }); },
+  step(m, dt){
+    const dir = (inp.right?1:0) - (inp.left?1:0);
+    if(m.ptr && m.ptr.down){ m.vx = Math.max(-520, Math.min(520, (m.ptr.x - m.x)*10)); }
+    else if(dir) m.vx += dir*2400*dt; else m.vx *= Math.pow(0.002, dt);
+    m.vx = Math.max(-420, Math.min(420, m.vx)); m.x = Math.max(30, Math.min(370, m.x + m.vx*dt));
+    m.fire -= dt;
+    if(m.fire <= 0){ m.fire = 0.28; const dbl = m.score >= 15;
+      for(const o of dbl ? [-12, 12] : [0]) m.shots.push({ x:m.x + o, y:590 }); tone(900, 500, .05, 'square', .03); }
+    for(const s of m.shots) s.y -= 620*dt;
+    m.shots = m.shots.filter(s => s.y > -20 && !s.dead);
+    const lvl = Math.min(1, MG.t/150);
+    m.spawn -= dt;
+    if(m.spawn <= 0){ m.spawn = 1.1 - lvl*0.6; m.ens.push({ x0:40 + Math.random()*320, y:-30, vy:45 + lvl*60 + Math.random()*20, ph:Math.random()*6, amp:20 + Math.random()*50, alive:true, deadT:0, x:0 }); }
+    for(const e of m.ens){
+      if(!e.alive){ e.deadT -= dt; continue; }
+      e.y += e.vy*dt; e.x = e.x0 + Math.sin(MG.t*1.6 + e.ph)*e.amp;
+      for(const s of m.shots) if(!s.dead && Math.abs(s.x - e.x) < 24 && Math.abs(s.y - (e.y - 18)) < 24){
+        s.dead = true; e.alive = false; e.deadT = .35; m.score++; STATS.stomps++; sfx.stomp(); mgPuff(e.x, e.y - 18, 8, '#ffd23f'); updateHud();
+        if(Math.random() < 0.35) m.drops.push({ x:e.x, y:e.y - 18 });
+        break;
+      }
+      if(e.alive && Math.abs(e.x - m.x) < 34 && Math.abs(e.y - 18 - 620) < 40){ e.alive = false; e.deadT = .3; mgHurt(); }
+      if(e.y > 760) e.alive = false;
+    }
+    m.ens = m.ens.filter(e => e.alive || e.deadT > 0);
+    for(const d of m.drops){ d.y += 150*dt; if(Math.abs(d.x - m.x) < 34 && Math.abs(d.y - 620) < 40){ d.dead = true; mgCoin(); } if(d.y > 760) d.dead = true; }
+    m.drops = m.drops.filter(d => !d.dead);
+    trailTick(m.x, 660, dt, true);
+  },
+  render(m){
+    skyFill('#141a36');
+    ctx.fillStyle = '#fff';
+    for(let i=0; i<70; i++){ const sp = 20 + hash(i)*80; ctx.globalAlpha = 0.4 + hash(i+3)*0.6; ctx.fillRect(hash(i+1)*VW, (hash(i+2)*VH + MG.t*sp) % VH, 2.5, 2.5); }
+    ctx.globalAlpha = 1;
+    const v = mgView(400, 720); mgBegin(v);
+    ctx.fillStyle = '#ffd23f'; for(const s of m.shots){ ctx.fillRect(s.x - 3, s.y - 10, 6, 16); }
+    for(const e of m.ens) drawEnemyAt(e.x, e.y, 1, TNOW + e.ph, 1, e.alive ? 1 : .35, false);
+    for(const d of m.drops) drawCoin(d.x, d.y, TNOW);
+    trailDraw();
+    // raketa
+    const x = m.x, y = 640;
+    ctx.fillStyle = Math.floor(TNOW*16) % 2 ? '#ffd23f' : '#ff7a2e'; ctx.beginPath(); ctx.moveTo(x - 12, y + 34); ctx.lineTo(x, y + 62 + Math.random()*10); ctx.lineTo(x + 12, y + 34); ctx.fill();
+    ctx.fillStyle = '#e8eef3'; ctx.strokeStyle = OUT; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.moveTo(x - 26, y + 36); ctx.quadraticCurveTo(x - 30, y - 6, x, y - 30); ctx.quadraticCurveTo(x + 30, y - 6, x + 26, y + 36); ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#ff5a4f'; ctx.beginPath(); ctx.moveTo(x - 26, y + 14); ctx.lineTo(x - 42, y + 40); ctx.lineTo(x - 24, y + 36); ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x + 26, y + 14); ctx.lineTo(x + 42, y + 40); ctx.lineTo(x + 24, y + 36); ctx.closePath(); ctx.fill(); ctx.stroke();
+    heroAt(x, y - 8, 54, 1, false);
+    mgDrawParts();
+    drawPaper();
+  }
+};
+
+/* ---------- 🟡 Bludiště ---------- */
+function mazeLevel(m){
+  if(VW < VH){ BW = 11; BH = 15; } else { BW = 15; BH = 11; }
+  const grid = new Uint8Array(BW*BH);
+  for(let y=0; y<BH; y++) for(let x=0; x<BW; x++) if(x === 0 || y === 0 || x === BW-1 || y === BH-1 || (x % 2 === 0 && y % 2 === 0)) grid[bIdx(x,y)] = 1;
+  m.coinsMap = new Set(); m.stars = new Set();
+  for(let y=1; y<BH-1; y++) for(let x=1; x<BW-1; x++) if(!grid[bIdx(x,y)] && !(x === 1 && y === 1)) m.coinsMap.add(bIdx(x,y));
+  for(const [x,y] of [[BW-2,1],[1,BH-2],[BW-2,BH-2],[(BW/2|0)|1, (BH/2|0)|1]]){ const i = bIdx(x,y); if(!grid[i]){ m.coinsMap.delete(i); m.stars.add(i); } }
+  m.pl = { x:1.5*BC, y:1.5*BC, face:1, walkT:0 };
+  BM = { grid, bombs:[], pl:m.pl };
+  m.ens = [];
+  const n = Math.min(6, 2 + m.lvl);
+  const spots = [[BW-2,BH-2],[BW-2,1],[1,BH-2],[BW-2,(BH/2|0)|1],[(BW/2|0)|1,BH-2],[(BW/2|0)|1,1]];
+  for(let k=0; k<n; k++){ const [x,y] = spots[k % spots.length]; m.ens.push({ x:(x+.5)*BC, y:(y+.5)*BC, hx:(x+.5)*BC, hy:(y+.5)*BC, dx:-1, dy:0, face:-1, alive:true, back:0, lastTurn:-1 }); }
+  m.power = 0;
+}
+MINIS.maze = { name:'Bludiště', icon:'🟡', unit:'🪙', ctrl:'dpad', music:'bomb', say:'Bludiště. Posbírej všechny mince. Hvězda ti dá sílu na příšerky.',
+  start(m, keep){ m.lvl = keep ? keep.lvl : 1; mazeLevel(m); },
+  step(m, dt){
+    const pl = m.pl, d = 135*dt;
+    let moved = false;
+    const hx = (inp.right?1:0) - (inp.left?1:0), vy = (inp.down?1:0) - (inp.up?1:0);
+    if(hx){ pl.face = hx; moved = bMove(pl, hx, 0, d, pl); }
+    if(!moved && vy) moved = bMove(pl, 0, vy, d, pl);
+    if(moved) pl.walkT += dt;
+    trailTick(pl.x, pl.y + BC*0.45, dt, moved);
+    const pi = bIdx(bCell(pl.x), bCell(pl.y));
+    if(m.coinsMap.has(pi)){ m.coinsMap.delete(pi); m.score++; mgCoin(); }
+    if(m.stars.has(pi)){ m.stars.delete(pi); m.power = 7; sfx.power(); toast('🌟 Teď můžeš chytat příšerky!'); }
+    if(m.power > 0) m.power -= dt;
+    for(const e of m.ens){
+      if(e.back > 0){ e.back -= dt; if(e.back <= 0){ e.x = e.hx; e.y = e.hy; } continue; }
+      const sp = (m.power > 0 ? 55 : 80 + m.lvl*6)*dt;
+      const ok = bMove(e, e.dx, e.dy, sp, null);
+      const cx = bCell(e.x), cy = bCell(e.y), key = cy*BW + cx;
+      const atC = Math.abs(e.x - (cx+.5)*BC) < 2 && Math.abs(e.y - (cy+.5)*BC) < 2;
+      if(!ok || (atC && e.lastTurn !== key)){
+        e.lastTurn = key;
+        const opts = [[1,0],[-1,0],[0,1],[0,-1]].filter(([dx,dy]) => !bBlocked(cx+dx, cy+dy, null) && !(ok && dx === -e.dx && dy === -e.dy));
+        if(opts.length){
+          const tx = bCell(pl.x), ty = bCell(pl.y);
+          opts.sort((a, b) => (Math.abs(cx+a[0]-tx) + Math.abs(cy+a[1]-ty)) - (Math.abs(cx+b[0]-tx) + Math.abs(cy+b[1]-ty)));
+          if(m.power > 0) opts.reverse();
+          const o = Math.random() < 0.55 ? opts[0] : opts[Math.random()*opts.length|0];
+          e.dx = o[0]; e.dy = o[1]; if(o[0]) e.face = o[0];
+        }
+      }
+      if(Math.abs(e.x - pl.x) < BC*0.6 && Math.abs(e.y - pl.y) < BC*0.6){
+        if(m.power > 0){ e.back = 3; mgPuff(e.x, e.y, 8); sfx.stomp(); STATS.stomps++; mgCoin(3); }
+        else { mgHurt(); if(state !== 'play') return; pl.x = 1.5*BC; pl.y = 1.5*BC; }
+      }
+    }
+    if(!m.coinsMap.size && state === 'play'){
+      state = 'done'; sfx.win(); saveStats();
+      if(m.score > mgRecord()) store.set('kh_rec_maze', m.score);
+      const keep = { lvl:m.lvl + 1, coins:MG.coins, score:m.score };
+      showMsg('Bludiště ' + m.lvl + ' hotové!', '🪙 ' + MG.coins, [
+        { icon:'▶', label:'Další bludiště', primary:true, fn: () => startMini('maze', keep) },
+        { icon:'🏠', label:'Domů', fn: toMenu } ], '🟡', 'Všechny mince posbírané!');
+    }
+  },
+  render(m){
+    const top = 70, avail = VH - top - (VW < VH && isTouch ? 230 : 10);
+    let sc; if(VW < VH) sc = Math.min(VW/(BW*BC), avail/(BH*BC)); else sc = Math.min((VW - (isTouch ? 400 : 20))/(BW*BC), (VH - top - 10)/(BH*BC));
+    MG.view = { sc, ox:(VW - BW*BC*sc)/2, oy: top + Math.max(0, (avail - BH*BC*sc)/2) };
+    skyFill('#1d2547'); mgBegin(MG.view);
+    for(let y=0; y<BH; y++) for(let x=0; x<BW; x++){
+      const px = x*BC, py = y*BC, i = bIdx(x,y);
+      if(BM.grid[i]){ ctx.fillStyle = '#4f7fd9'; ctx.fillRect(px+2, py+2, BC-4, BC-4); hatch(ctx, px+2, py+2, BC-4, BC-4, '#2f5fb9', i, 9);
+        ctx.strokeStyle = OUT; ctx.lineWidth = 3; wrect(ctx, px+2, py+2, BC-4, BC-4, i); ctx.stroke(); }
+      else if(m.coinsMap.has(i)){ ctx.fillStyle = '#ffd23f'; ctx.strokeStyle = '#7a5a00'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(px+BC/2, py+BC/2, 7, 0, Math.PI*2); ctx.fill(); ctx.stroke(); }
+      else if(m.stars.has(i)){ const r = 16 + Math.sin(TNOW*6)*3; ctx.fillStyle = `hsl(${(TNOW*200)%360},90%,60%)`; ctx.strokeStyle = OUT; ctx.beginPath();
+        for(let k=0; k<10; k++){ const a = k/10*Math.PI*2 - Math.PI/2, rr = k%2 ? r*0.45 : r; ctx.lineTo(px+BC/2+Math.cos(a)*rr, py+BC/2+Math.sin(a)*rr); } ctx.closePath(); ctx.fill(); ctx.stroke(); }
+    }
+    for(const e of m.ens){
+      if(e.back > 0) continue;
+      if(m.power > 0){ ctx.globalAlpha = m.power < 2 && Math.floor(TNOW*8) % 2 ? 1 : 0.55; }
+      drawEnemyAt(e.x, e.y + BC*0.42, e.face, TNOW + e.hx, 0.82, 1, false); ctx.globalAlpha = 1;
+    }
+    trailDraw();
+    const pl = m.pl;
+    heroAt(pl.x, pl.y + BC*0.45 + Math.abs(Math.sin(pl.walkT*14))*-3, 50, pl.face, true);
+    mgDrawParts();
+    drawPaper();
+  }
+};
+
+/* ---------- 🐍 Had ---------- */
+MINIS.snake = { name:'Had', icon:'🐍', unit:'🍎', ctrl:'dpad', say:'Had. Řiď hada a sbírej mince. Nenaraz do zdi.',
+  start(m){ m.cols = VW < VH ? 12 : 18; m.rows = VW < VH ? 16 : 11; snakeReset(m); },
+  move(p){ const m = MG, dx = p.x - p.lx, dy = p.y - p.ly; if(Math.hypot(dx, dy) > 30){ snakeTurn(m, Math.abs(dx) > Math.abs(dy) ? [Math.sign(dx), 0] : [0, Math.sign(dy)]); p.lx = p.x; p.ly = p.y; } },
+  down(p){ p.lx = p.x; p.ly = p.y; },
+  step(m, dt){
+    if(inp.left) snakeTurn(m, [-1,0]); if(inp.right) snakeTurn(m, [1,0]); if(inp.up) snakeTurn(m, [0,-1]); if(inp.down) snakeTurn(m, [0,1]);
+    m.acc += dt;
+    const iv = Math.max(0.1, 0.22 - m.body.length*0.005);
+    while(m.acc >= iv && state === 'play'){
+      m.acc -= iv; m.dir = m.want;
+      const h = m.body[0], nx = h[0] + m.dir[0], ny = h[1] + m.dir[1];
+      if(nx < 0 || ny < 0 || nx >= m.cols || ny >= m.rows || m.body.some(b => b[0] === nx && b[1] === ny)){
+        mgHurt(); if(state === 'play') snakeReset(m); return;
+      }
+      m.body.unshift([nx, ny]);
+      if(nx === m.food[0] && ny === m.food[1]){ m.score++; mgCoin(); mgPuff((nx+.5)*40, (ny+.5)*40, 5, '#ffd23f'); snakeFood(m); if(m.score >= 15) award('hadik'); }
+      else m.body.pop();
+      trailTick((nx+.5)*40, (ny+.5)*40 + 18, 0.2, true);
+    }
+    trailTick(0, 0, dt, false);
+  },
+  render(m){
+    const W = m.cols*40, H = m.rows*40, top = 70, avail = VH - top - (VW < VH && isTouch ? 230 : 10);
+    let sc; if(VW < VH) sc = Math.min(VW/W, avail/H); else sc = Math.min((VW - (isTouch ? 400 : 20))/W, (VH - top - 10)/H);
+    MG.view = { sc, ox:(VW - W*sc)/2, oy: top + Math.max(0, (avail - H*sc)/2) };
+    skyFill('#3f7a34'); mgBegin(MG.view);
+    for(let y=0; y<m.rows; y++) for(let x=0; x<m.cols; x++){ ctx.fillStyle = (x + y) % 2 ? '#7ccf5f' : '#72c455'; ctx.fillRect(x*40, y*40, 40.5, 40.5); }
+    ctx.strokeStyle = OUT; ctx.lineWidth = 4; wrect(ctx, 0, 0, W, H, 3); ctx.stroke();
+    drawCoin((m.food[0]+.5)*40, (m.food[1]+.5)*40, TNOW);
+    trailDraw();
+    for(let i=m.body.length-1; i>0; i--){
+      const [x,y] = m.body[i];
+      ctx.fillStyle = EQ.trail === 'duha' ? `hsl(${(i*30)%360},80%,60%)` : i % 2 ? '#ff8a3d' : '#ffb067';
+      ctx.strokeStyle = OUT; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc((x+.5)*40, (y+.5)*40, 16, 0, Math.PI*2); ctx.fill(); ctx.stroke();
+    }
+    const h = m.body[0];
+    heroAt((h[0]+.5)*40, (h[1]+.5)*40 + 22, 46, m.dir[0] < 0 ? -1 : 1, true);
+    mgDrawParts();
+    drawPaper();
+  }
+};
+function snakeReset(m){ const cx = m.cols/2|0, cy = m.rows/2|0; m.body = [[cx,cy],[cx-1,cy],[cx-2,cy]]; m.dir = [1,0]; m.want = [1,0]; m.acc = 0; snakeFood(m); }
+function snakeFood(m){ let x, y, n = 0; do { x = Math.random()*m.cols|0; y = Math.random()*m.rows|0; n++; } while(n < 500 && m.body.some(b => b[0] === x && b[1] === y)); m.food = [x, y]; }
+function snakeTurn(m, d){ if(d[0] === -m.dir[0] && d[1] === -m.dir[1]) return; m.want = d; }
+
+/* ---------- ⚽ Penalty ---------- */
+MINIS.penalty = { name:'Penalty', icon:'⚽', unit:'⚽', ctrl:'drag', say:'Penalty. Švihni prstem od míče k bráně.',
+  start(m){ Object.assign(m, { ball:null, gx:200, gdir:1, res:'', resT:0, dive:0 }); },
+  down(p){ const m = MG; if(m.ball || m.resT > 0) return; if(Math.hypot(p.x - 200, p.y - 600) < 110){ m.aim = { x:p.x, y:p.y, t:TNOW }; } },
+  up(p){
+    const m = MG; if(!m.aim) return; const a = m.aim; m.aim = null;
+    const dy = p.y - a.y, dx = p.x - a.x; if(dy > -40) return;
+    const tx = 200 + dx*(340/Math.max(60, -dy)) * 1.0, len = Math.hypot(dx, dy), dt = Math.max(0.06, TNOW - a.t);
+    const h = Math.min(160, len*0.25 + (len/dt)*0.012);
+    m.ball = { t:0, tx: Math.max(-40, Math.min(440, tx)), h }; sfx.kick();
+    const lvl = Math.min(1, m.score/20);
+    m.gTarget = Math.random() < 0.2 + lvl*0.5 ? m.ball.tx : 80 + Math.random()*240;
+  },
+  step(m, dt){
+    const lvl = Math.min(1, m.score/20);
+    if(!m.ball){ m.gx += m.gdir*(40 + lvl*80)*dt; if(m.gx < 120 || m.gx > 280) m.gdir *= -1; m.dive = 0; }
+    else {
+      const b = m.ball; b.t += dt/0.62;
+      const sp = (140 + lvl*260)*dt; m.gx += Math.max(-sp, Math.min(sp, m.gTarget - m.gx)); m.dive = Math.max(-1, Math.min(1, (m.gTarget - 200)/120));
+      if(b.t >= 1){
+        const reach = 38 + lvl*30, inGoal = b.tx > 78 && b.tx < 322 && b.h < 128, saved = inGoal && Math.abs(b.tx - m.gx) < reach && b.h < 112;
+        if(saved){ m.res = 'Chytil!'; sfx.bump(); mgHurt(); }
+        else if(inGoal){ m.res = 'GÓL!'; m.score++; mgCoin(); sfx.goal(); updateHud(); if(m.score >= 10) award('kanonyr'); }
+        else { m.res = 'Vedle!'; tone(300, 150, .3, 'triangle', .12); mgHurt(); }
+        m.resT = 1.1; m.last = b; m.ball = null;
+      }
+    }
+    if(m.resT > 0){ m.resT -= dt; }
+  },
+  render(m){
+    skyFill('#8fd3ff');
+    const v = mgView(400, 720); mgBegin(v);
+    // tribuna
+    ctx.fillStyle = '#5b6b7d'; ctx.fillRect(-300, 0, 1000, 120);
+    for(let i=0; i<40; i++) for(let r=0; r<3; r++){ ctx.fillStyle = ['#ff5a4f','#ffd23f','#fff','#2f7de1'][(i*3+r)%4]; ctx.beginPath(); ctx.arc(-100 + i*16 + (r%2)*8, 24 + r*32 - (m.res === 'GÓL!' && m.resT > 0 ? Math.abs(Math.sin(TNOW*14 + i))*8 : 0), 7, 0, Math.PI*2); ctx.fill(); }
+    ctx.fillStyle = '#5cc94a'; ctx.fillRect(-300, 120, 1000, 700);
+    ctx.fillStyle = '#6fd65c'; for(let k=0; k<6; k++) ctx.fillRect(-300, 160 + k*100, 1000, 50);
+    ctx.strokeStyle = '#fff'; ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(-300, 262); ctx.lineTo(700, 262); ctx.moveTo(40, 262); ctx.lineTo(10, 420); ctx.lineTo(390, 420); ctx.lineTo(360, 262); ctx.stroke();
+    // brána
+    ctx.strokeStyle = 'rgba(255,255,255,.7)'; ctx.lineWidth = 2;
+    for(let x=80; x<=320; x+=20){ ctx.beginPath(); ctx.moveTo(x, 134); ctx.lineTo(x, 260); ctx.stroke(); }
+    for(let y=134; y<=260; y+=18){ ctx.beginPath(); ctx.moveTo(80, y); ctx.lineTo(320, y); ctx.stroke(); }
+    ctx.strokeStyle = OUT; ctx.lineWidth = 12; ctx.beginPath(); ctx.moveTo(78, 262); ctx.lineTo(78, 132); ctx.lineTo(322, 132); ctx.lineTo(322, 262); ctx.stroke();
+    ctx.strokeStyle = '#fff'; ctx.lineWidth = 7; ctx.stroke();
+    // brankář
+    ctx.save(); ctx.translate(m.gx, 262); ctx.rotate(m.dive*0.7); drawEnemyAt(0, 0, 1, TNOW, 1.7, 1, false); ctx.restore();
+    // míč
+    const b = m.ball || (m.resT > 0 ? m.last : null);
+    let bx = 200, by = 600, bs = 1;
+    if(b){ const t = Math.min(1, b.t); bx = 200 + (b.tx - 200)*t; by = 600 - (600 - 250)*t - Math.sin(t*Math.PI)*b.h*0.6 - b.h*0.5*t; bs = 1 - t*0.5; }
+    heroAt(140, 650, 82, 1, !!m.ball);
+    ctx.save(); ctx.translate(bx, by); ctx.scale(bs, bs); ctx.rotate(TNOW*(m.ball ? 12 : 0));
+    ctx.fillStyle = '#fff'; ctx.strokeStyle = OUT; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(0, 0, 22, 0, Math.PI*2); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = OUT; ctx.beginPath(); for(let k=0; k<5; k++){ const a = k/5*Math.PI*2 - Math.PI/2; ctx.lineTo(Math.cos(a)*8, Math.sin(a)*8); } ctx.closePath(); ctx.fill();
+    ctx.restore();
+    if(m.aim && MG.ptr){ ctx.strokeStyle = 'rgba(255,255,255,.85)'; ctx.lineWidth = 6; ctx.setLineDash([10,10]); ctx.beginPath(); ctx.moveTo(m.aim.x, m.aim.y); ctx.lineTo(MG.ptr.x, MG.ptr.y); ctx.stroke(); ctx.setLineDash([]); }
+    if(!m.ball && m.resT <= 0){ ctx.font = '40px sans-serif'; ctx.textAlign = 'center'; ctx.fillText('👆', 200, 690 + Math.sin(TNOW*5)*6); }
+    mgDrawParts();
+    drawPaper();
+    if(m.resT > 0) bigText(m.res, m.res === 'GÓL!' ? '#ffd23f' : '#ffffff');
+  }
+};
+
+/* ---------- 🏀 Koš ---------- */
+MINIS.basket = { name:'Koš', icon:'🏀', unit:'🏀', ctrl:'drag', say:'Koš. Švihni prstem od míče nahoru a hoď ho do koše.',
+  start(m){ Object.assign(m, { ball:null, hy:300, res:'', resT:0, streak:0 }); },
+  down(p){ const m = MG; if(m.ball) return; if(Math.hypot(p.x - 90, p.y - 590) < 110) m.aim = { x:p.x, y:p.y, t:TNOW }; },
+  up(p){
+    const m = MG; if(!m.aim) return; const a = m.aim; m.aim = null;
+    const dx = p.x - a.x, dy = p.y - a.y, len = Math.hypot(dx, dy); if(len < 30 || dy > -10) return;
+    // úhel podle švihu, síla dopočítaná tak, aby míč doletěl ke koši; síla švihu přidá trochu nepřesnosti
+    const th = Math.max(55, Math.min(82, Math.atan2(-dy, Math.max(1, dx))*180/Math.PI))*Math.PI/180;
+    const X = 320 - 90, H = 590 - m.hy, g = 1400;
+    const v2 = g*X*X/(2*Math.cos(th)**2*(X*Math.tan(th) - H));
+    const f = Math.max(0.7, Math.min(1.3, len/200));
+    const sp = Math.sqrt(Math.max(1, v2))*(1 + (f - 1)*0.22);
+    m.ball = { x:90, y:590, vx:Math.cos(th)*sp, vy:-Math.sin(th)*sp, r:22, t:0, scored:false, prevY:590 };
+    if(!playVoice('hop', 0)) tone(400, 700, .12, 'triangle', .1);
+  },
+  step(m, dt){
+    if(m.score >= 5) m.hy = 300 + Math.sin(MG.t*0.9)*90;
+    const rimL = { x:290, y:m.hy }, rimR = { x:350, y:m.hy }, board = { x:362, y0:m.hy - 110, y1:m.hy + 18 };
+    const b = m.ball;
+    if(b){
+      b.t += dt; b.prevY = b.y; b.vy += 1400*dt; b.x += b.vx*dt; b.y += b.vy*dt;
+      for(const rp of [rimL, rimR]){
+        const dx = b.x - rp.x, dy = b.y - rp.y, d = Math.hypot(dx, dy);
+        if(d < b.r + 5 && d > 0){ const nx = dx/d, ny = dy/d, dot = b.vx*nx + b.vy*ny;
+          if(dot < 0){ b.vx -= 1.6*dot*nx; b.vy -= 1.6*dot*ny; b.vx *= 0.8; b.vy *= 0.8; sfx.bump(); }
+          b.x = rp.x + nx*(b.r + 5); b.y = rp.y + ny*(b.r + 5); }
+      }
+      if(b.x + b.r > board.x && b.x - b.r < board.x + 8 && b.y > board.y0 && b.y < board.y1 && b.vx > 0){ b.vx = -b.vx*0.6; b.x = board.x - b.r; sfx.bump(); }
+      if(!b.scored && b.vy > 0 && b.prevY < m.hy && b.y >= m.hy && b.x > rimL.x + 6 && b.x < rimR.x - 6){
+        b.scored = true; m.score++; m.streak++; mgCoin(m.streak >= 3 ? 2 : 1); sfx.win(); m.res = m.streak >= 3 ? 'Paráda!' : 'Koš!'; m.resT = 1;
+        if(m.score >= 10) award('kosik'); updateHud();
+      }
+      if(b.y > 760 || b.x < -60 || b.x > 460 || b.t > 5){
+        if(!b.scored){ m.streak = 0; m.res = 'Vedle'; m.resT = 0.8; mgHurt(); }
+        m.ball = null;
+      }
+      trailTick(b.x, b.y, dt, true);
+    } else trailTick(0, 0, dt, false);
+    if(m.resT > 0) m.resT -= dt;
+  },
+  render(m){
+    skyFill('#f6d7a6');
+    const v = mgView(400, 720); mgBegin(v);
+    ctx.fillStyle = '#e8b878'; ctx.fillRect(-300, 640, 1000, 300);
+    ctx.strokeStyle = OUT; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(-300, 640); ctx.lineTo(700, 640); ctx.stroke();
+    for(let k=0; k<8; k++){ ctx.strokeStyle = 'rgba(160,110,60,.35)'; ctx.beginPath(); ctx.moveTo(-300, 660 + k*12); ctx.lineTo(700, 660 + k*12); ctx.stroke(); }
+    // koš
+    const hy = m.hy;
+    ctx.fillStyle = '#7a7f86'; ctx.fillRect(366, hy - 110, 10, 700);
+    ctx.fillStyle = '#fff'; ctx.fillRect(362, hy - 110, 10, 128); ctx.strokeStyle = OUT; ctx.lineWidth = 3; ctx.strokeRect(362, hy - 110, 10, 128);
+    ctx.strokeStyle = 'rgba(255,255,255,.9)'; ctx.lineWidth = 2;
+    for(let k=0; k<5; k++){ ctx.beginPath(); ctx.moveTo(292 + k*14, hy); ctx.lineTo(300 + k*10, hy + 46); ctx.stroke(); }
+    ctx.beginPath(); ctx.moveTo(298, hy + 22); ctx.lineTo(344, hy + 22); ctx.moveTo(300, hy + 44); ctx.lineTo(340, hy + 44); ctx.stroke();
+    ctx.strokeStyle = '#ff5a1f'; ctx.lineWidth = 6; ctx.beginPath(); ctx.moveTo(288, hy); ctx.lineTo(362, hy); ctx.stroke();
+    heroAt(60, 642, 90, 1, !!m.ball);
+    const b = m.ball, bx = b ? b.x : 90, by = b ? b.y : 590;
+    ctx.save(); ctx.translate(bx, by); ctx.rotate(b ? b.t*8 : 0);
+    ctx.fillStyle = '#ff8a3d'; ctx.strokeStyle = OUT; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(0, 0, 22, 0, Math.PI*2); ctx.fill(); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(-22, 0); ctx.lineTo(22, 0); ctx.moveTo(0, -22); ctx.lineTo(0, 22); ctx.arc(0, 0, 13, -0.9, 0.9); ctx.stroke();
+    ctx.restore();
+    if(m.aim && MG.ptr){ ctx.strokeStyle = 'rgba(35,32,28,.6)'; ctx.lineWidth = 6; ctx.setLineDash([10,10]); ctx.beginPath(); ctx.moveTo(m.aim.x, m.aim.y); ctx.lineTo(MG.ptr.x, MG.ptr.y); ctx.stroke(); ctx.setLineDash([]); }
+    if(!b){ ctx.font = '40px sans-serif'; ctx.textAlign = 'center'; ctx.fillText('👆', 140, 600 + Math.sin(TNOW*5)*6); }
+    trailDraw(); mgDrawParts();
+    drawPaper();
+    if(m.resT > 0) bigText(m.res, m.res === 'Vedle' ? '#ffffff' : '#ffd23f');
+  }
+};
+function updateHudLite(){ const el = $('#hPow'), t = MINI.unit + ' ' + MG.score; if(el.textContent !== t) el.textContent = t; }
+
+// Seznam všech her pro menu
+const GAMES = [
+  { id:'run',     e:'🏃', n:'Skákání',  bg:'#5cc94a', say:'Skákání po levelech' },
+  { id:'tower',   e:'🏢', n:'Věž',      bg:'#8fd3ff', say:'Věž. Skákej co nejvýš.', rec:'kh_tower' },
+  { id:'bomb',    e:'💣', n:'Bomby',    bg:'#ff9a55', say:'Bomby. Rozbij bedny a příšerky.', rec:'kh_bomb' },
+  { id:'fly',     e:'🐦', n:'Létání',   bg:'#b8e6ff', say:'Létání. Ťukej a leť.' },
+  { id:'runner',  e:'👟', n:'Běh',      bg:'#ffd23f', say:'Nekonečný běh. Ťukni a skoč.' },
+  { id:'catch',   e:'🧺', n:'Chytání',  bg:'#ffb3c7', say:'Chytání mincí.' },
+  { id:'sling',   e:'🎯', n:'Prak',     bg:'#c9a66b', say:'Prak. Vystřel postavičku na příšerky.' },
+  { id:'space',   e:'🚀', n:'Vesmír',   bg:'#7d8fd9', say:'Vesmír. Střílej příšerky.' },
+  { id:'maze',    e:'🟡', n:'Bludiště', bg:'#4f7fd9', say:'Bludiště. Sbírej mince, příšerky tě honí.' },
+  { id:'snake',   e:'🐍', n:'Had',      bg:'#8fdc82', say:'Had. Sbírej mince a rosti.' },
+  { id:'penalty', e:'⚽', n:'Penalty',  bg:'#e8eef3', say:'Penalty. Dej gól přes brankáře.' },
+  { id:'basket',  e:'🏀', n:'Koš',      bg:'#f6b26b', say:'Koš. Hoď míč do koše.' }
+];
+function startGame(id){
+  if(id === 'run') playNext(); else if(id === 'tower') startTower(); else if(id === 'bomb') startBomb(1); else startMini(id);
+}
+
 /* Společné spuštění hry a ovládání podle režimu */
+function stepMini(dt){ mgStepCommon(dt); MINI.step(MG, dt); }
+function musicKey(){ return MODE === 'run' ? ((G && G.def.theme) || 'meadow') : MODE === 'mini' ? (MINI.music || MG.id) : MODE; }
 function startPlay(speech){
   jumpBuf = 0; inp.left = inp.right = inp.jump = inp.up = inp.down = inp.bomb = false; ptr.clear();
   state = 'play';
@@ -2327,16 +3011,19 @@ function startPlay(speech){
   document.querySelector('meta[name=theme-color]').setAttribute('content', MODE === 'bomb' ? '#3f7a34' : '#8fd3ff');
   updateHud(); say(speech);
   TRAIL = [];
-  Music.start(MODE === 'run' ? (G && G.def.theme) || 'meadow' : MODE);
+  Music.start(musicKey());
 }
 function showControls(){
   $('#hud').hidden = false;
-  $('#touch').hidden = !isTouch || MODE === 'bomb';
-  $('#tJump').hidden = MODE === 'tower';
-  $('#dpad').hidden = !isTouch || MODE !== 'bomb';
+  const c = MODE === 'mini' ? MINI.ctrl : MODE === 'bomb' ? 'dpadb' : MODE === 'tower' ? 'lr' : 'run';
+  $('#touch').hidden = !isTouch || !(c === 'lr' || c === 'run');
+  $('#tJump').hidden = c !== 'run';
+  $('#dpad').hidden = !isTouch || !(c === 'dpad' || c === 'dpadb');
+  $('#dpad .bomb').hidden = c !== 'dpadb';
 }
 function restartMode(){
-  if(MODE === 'tower') startTower();
+  if(MODE === 'mini') startMini(MG.id);
+  else if(MODE === 'tower') startTower();
   else if(MODE === 'bomb') startBomb(BM.stage, null);
   else startLevel(G.ref);
 }
@@ -2346,6 +3033,11 @@ function restartMode(){
    ===================================================================== */
 function updateHud(){
   $('#bSound').textContent = soundOn ? '🔊' : '🔇';
+  if(MODE === 'mini' && MG){
+    $('#hHearts').textContent = MG.id === 'sling' ? '🎯 ' + Math.max(0, MG.shots) : '❤️'.repeat(Math.max(0, MG.hearts)) + '🤍'.repeat(Math.max(0, 3-MG.hearts));
+    $('#hCoins').textContent = '🪙 ' + MG.coins; $('#hPow').textContent = MINI.unit + ' ' + (MG.id === 'sling' ? MG.lvl : MG.score); $('#hLevel').textContent = MINI.name;
+    return;
+  }
   if(MODE === 'tower' && TW){
     $('#hHearts').textContent = '❤️'.repeat(Math.max(0, P.hearts)) + '🤍'.repeat(Math.max(0, 3-P.hearts));
     $('#hCoins').textContent = '🪙 ' + TW.coinCount; $('#hPow').textContent = '🏢 ' + TW.floor; $('#hLevel').textContent = 'Věž';
@@ -2429,7 +3121,7 @@ function levelDone(){
   showMsg(title, text, btns, '⭐'.repeat(stars) + '☆'.repeat(3-stars),
     title + ' Máš ' + starWord + '. ' + (stars < 3 ? 'Na tři hvězdy posbírej skoro všechny mince.' : 'Paráda!'));
 }
-function toMenu(){ Music.stop(); state = 'menu'; G = null; TW = null; BM = null; MODE = 'run'; saveStats(); renderMenu(); showScreen('#menu');
+function toMenu(){ Music.stop(); state = 'menu'; G = null; TW = null; BM = null; MG = null; MINI = null; MODE = 'run'; saveStats(); renderMenu(); showScreen('#menu');
   document.querySelector('meta[name=theme-color]').setAttribute('content', '#8fd3ff'); }
 
 /* ---------- Menu ---------- */
@@ -2497,11 +3189,17 @@ function renderMenu(){
       gal.appendChild(d);
     }
   }
-  const bt = store.get('kh_tower', 0), bb = store.get('kh_bomb', 0);
-  $('#gTowerLbl').textContent = bt ? '🏆 ' + bt : 'Věž';
-  $('#gBombLbl').textContent = bb ? '🏆 ' + bb : 'Bomby';
-  $('#gTower').setAttribute('aria-label', 'Věž. Skákej co nejvýš.' + (bt ? ' Tvůj rekord je ' + bt + '. patro.' : ''));
-  $('#gBomb').setAttribute('aria-label', 'Bomby. Rozbij bedny a příšerky.' + (bb ? ' Tvůj rekord je ' + bb + '. kolo.' : ''));
+  const gbox = $('#games'); gbox.innerHTML = '';
+  for(const g of GAMES){
+    const rec = g.id === 'run' ? 0 : store.get(g.rec || 'kh_rec_' + g.id, 0);
+    const el = document.createElement('button'); el.className = 'game'; el.style.background = g.bg;
+    if(g.id === 'maze' || g.id === 'space') el.style.color = '#fff';
+    el.innerHTML = '<span class="gi">' + g.e + '</span><span class="tl"></span>';
+    el.lastChild.textContent = rec ? '🏆 ' + rec : g.n;
+    el.setAttribute('aria-label', g.say + (rec ? ' Tvůj rekord je ' + rec + '.' : ''));
+    el.onclick = () => startGame(g.id);
+    gbox.appendChild(el);
+  }
   $('#shopLbl').textContent = '🪙 ' + wallet();
   const nStk = STICKERS.filter(s => STK[s.id]).length;
   $('#stkLbl').textContent = nStk + ' / ' + STICKERS.length;
@@ -2679,16 +3377,21 @@ function lvSave(){
 const KEYS = { ArrowLeft:'left', KeyA:'left', ArrowRight:'right', KeyD:'right', Space:'jump', ArrowUp:'jump', KeyW:'jump' };
 const KEYS_BOMB = { ArrowLeft:'left', KeyA:'left', ArrowRight:'right', KeyD:'right', ArrowUp:'up', KeyW:'up', ArrowDown:'down', KeyS:'down', Space:'bomb', Enter:'bomb' };
 const KEYS_TOWER = { ArrowLeft:'left', KeyA:'left', ArrowRight:'right', KeyD:'right' };
-function keyFor(code){ return (MODE === 'bomb' ? KEYS_BOMB : MODE === 'tower' ? KEYS_TOWER : KEYS)[code]; }
+const KEYS_TAP = { Space:'jump', ArrowUp:'jump', KeyW:'jump', Enter:'jump' };
+const KEYS_DPAD = { ArrowLeft:'left', KeyA:'left', ArrowRight:'right', KeyD:'right', ArrowUp:'up', KeyW:'up', ArrowDown:'down', KeyS:'down' };
+function keyFor(code){
+  if(MODE === 'mini') return ({ tap:KEYS_TAP, lr:KEYS_TOWER, dpad:KEYS_DPAD, drag:{} })[MINI.ctrl][code];
+  return (MODE === 'bomb' ? KEYS_BOMB : MODE === 'tower' ? KEYS_TOWER : KEYS)[code];
+}
 window.addEventListener('keydown', e => {
   if(state === 'play' && (e.code === 'Escape' || e.code === 'KeyP')){ pause(); return; }
   const k = keyFor(e.code); if(!k || state !== 'play') return;
   e.preventDefault();
-  if(k === 'jump' && !inp.jump) jumpBuf = 0.12;
+  if(k === 'jump' && !inp.jump){ jumpBuf = 0.12; if(MG) MG.tap = 0.15; }
   if(k === 'bomb' && !inp.bomb) bombBuf = 0.15;
   inp[k] = true;
 });
-window.addEventListener('keyup', e => { for(const m of [KEYS, KEYS_BOMB, KEYS_TOWER]){ const k = m[e.code]; if(k) inp[k] = false; } });
+window.addEventListener('keyup', e => { for(const m of [KEYS, KEYS_BOMB, KEYS_TOWER, KEYS_TAP, KEYS_DPAD]){ const k = m[e.code]; if(k) inp[k] = false; } });
 window.addEventListener('blur', () => { for(const k in inp) inp[k] = false; if(state === 'play') pause(); });
 document.addEventListener('visibilitychange', () => { if(document.hidden){ if(state === 'play') pause(); saveStats(); } });
 
@@ -2708,6 +3411,27 @@ for(const sel of ['#touch', '#dpad']){
 }
 window.addEventListener('pointermove', e => { if(ptr.has(e.pointerId)){ ptr.set(e.pointerId, btnAt(e.clientX, e.clientY)); syncTouch(); } });
 const ptrEnd = e => { if(ptr.delete(e.pointerId)) syncTouch(); };
+cv.addEventListener('pointerdown', e => {
+  if(MODE !== 'mini' || state !== 'play' || !MG) return;
+  e.preventDefault();
+  const w = mgWorld(e.clientX, e.clientY);
+  MG.ptr = { id:e.pointerId, x0:w.x, y0:w.y, x:w.x, y:w.y, down:true };
+  MG.tap = 0.15;
+  if(MINI.down) MINI.down(MG.ptr);
+});
+window.addEventListener('pointermove', e => {
+  if(!MG || !MG.ptr || MG.ptr.id !== e.pointerId) return;
+  const w = mgWorld(e.clientX, e.clientY); MG.ptr.x = w.x; MG.ptr.y = w.y;
+  if(MINI.move) MINI.move(MG.ptr);
+});
+const cvUp = e => {
+  if(!MG || !MG.ptr || MG.ptr.id !== e.pointerId) return;
+  const p = MG.ptr; p.down = false;
+  if(e.type === 'pointerup' && MINI.up && state === 'play'){ const w = mgWorld(e.clientX, e.clientY); p.x = w.x; p.y = w.y; MINI.up(p); }
+  MG.ptr = null;
+};
+window.addEventListener('pointerup', cvUp);
+window.addEventListener('pointercancel', cvUp);
 window.addEventListener('pointerup', ptrEnd);
 window.addEventListener('pointercancel', ptrEnd);
 window.addEventListener('touchstart', () => { if(!isTouch){ isTouch = true; resize(); if(state === 'play') showControls(); } }, { passive:true });
@@ -2715,11 +3439,9 @@ $('#touch').addEventListener('contextmenu', e => e.preventDefault());
 
 $('#bPause').onclick = pause;
 $('#bSound').onclick = () => { soundOn = !soundOn; store.set('kh_sound', soundOn); updateHud();
-  if(!soundOn) Music.stop(); else Music.start(MODE === 'run' ? (G && G.def.theme) || 'meadow' : MODE); };
+  if(!soundOn) Music.stop(); else if(state !== 'menu') Music.start(musicKey()); };
 function playNext(){ const i = LEVELS.findIndex((_, k) => !STARS['m'+k]); startLevel(i < 0 ? 0 : i); }
-$('#gRun').onclick = playNext;
-$('#gTower').onclick = startTower;
-$('#gBomb').onclick = () => startBomb(1);
+
 $('#heroBox').onclick = () => { tab = 'hero'; renderMenu(); $('#gallery').scrollIntoView({ behavior:'smooth', block:'center' }); };
 $('#bVoice').onclick = () => { voiceOn = !voiceOn; store.set('kh_voice', voiceOn); $('#bVoice').classList.toggle('off', !voiceOn); if(voiceOn) say('Hlas je zapnutý'); else try{ speechSynthesis.cancel(); }catch(e){} };
 for(const t of document.querySelectorAll('.tab')) t.onclick = () => { tab = t.dataset.kind; renderMenu(); };
@@ -2751,13 +3473,14 @@ let last = performance.now(), accT = 0;
 function frame(now){
   requestAnimationFrame(frame);
   const dt = Math.min(0.1, (now - last)/1000); last = now; TNOW = now/1000;
-  const stepFn = MODE === 'tower' ? (TW && stepTower) : MODE === 'bomb' ? (BM && stepBomb) : (G && step);
+  const stepFn = MODE === 'mini' ? (MG && stepMini) : MODE === 'tower' ? (TW && stepTower) : MODE === 'bomb' ? (BM && stepBomb) : (G && step);
   if(state === 'play' && stepFn){
     accT += dt;
     while(accT >= STEP && state === 'play'){ stepFn(STEP); accT -= STEP; }
   } else accT = 0;
   if(state !== 'menu'){
-    if(MODE === 'tower' && TW) renderTower();
+    if(MODE === 'mini' && MG) MINI.render(MG);
+    else if(MODE === 'tower' && TW) renderTower();
     else if(MODE === 'bomb' && BM) renderBomb();
     else if(G) render();
   }
@@ -2781,7 +3504,7 @@ if('serviceWorker' in navigator && (location.protocol === 'https:' || location.h
 }
 
 // pro testování
-window.KH = { press(){ jumpBuf = 0.12; }, get EQ(){ return EQ; }, wallet, Music, drawHero, bomb(){ bombBuf = 0.15; }, startTower, startBomb, stepTower, stepBomb, get TW(){ return TW; }, get BM(){ return BM; }, get MODE(){ return MODE; }, get BW(){ return BW; }, LEVELS, buildLevel, processImage, sheetToGrid, assembleLevel, customDef, startLevel,
+window.KH = { press(){ jumpBuf = 0.12; }, startMini, stepMini, get MG(){ return MG; }, MINIS, slPull, get EQ(){ return EQ; }, wallet, Music, drawHero, bomb(){ bombBuf = 0.15; }, startTower, startBomb, stepTower, stepBomb, get TW(){ return TW; }, get BM(){ return BM; }, get MODE(){ return MODE; }, get BW(){ return BW; }, LEVELS, buildLevel, processImage, sheetToGrid, assembleLevel, customDef, startLevel,
   get G(){ return G; }, get P(){ return P; }, get state(){ return state; }, inp, step, award, get STK(){ return STK; } };
 </script>
 </body>
